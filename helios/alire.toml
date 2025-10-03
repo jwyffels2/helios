@@ -1,0 +1,9 @@
+name = "helios"
+description = "Shiny new project"
+version = "0.1.0-dev"
+
+authors = ["Justin Wyffels"]
+maintainers = ["Justin Wyffels <justinwyffels@gmail.com>"]
+maintainers-logins = ["woobler"]
+
+executables = ["helios"]
