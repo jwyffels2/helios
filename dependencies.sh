@@ -7,5 +7,5 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 apt install alire=1.2.1-2build1 -y
-apt install -y build-essential=12.12ubuntu1
-apt install -y libc6-dev=2.41-6ubuntu1.2
+apt install build-essential=12.12ubuntu1 -y
+apt install libc6-dev=2.41-6ubuntu1.2 -y
