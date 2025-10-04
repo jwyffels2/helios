@@ -27,7 +27,7 @@ git clone https://github.com/jwyffels2/helios.git
 Run the script to install **WSL2**, **Podman**, and **Alire**:
 
 ```powershell
-./Windows_Dependencies.bat
+${projectDir}/Windows_Dependencies.bat
 ```
 
 > After it finishes, **close and reopen** your terminal so new tools are on your PATH.
@@ -78,14 +78,14 @@ This starts a container you can interact with, and mounts your current folder in
 
 **Run Container With Volume Attached:**
 ```bash
-podman run --rm -it --name helios -v "$PWD:/workspace" -w /workspace helios-build
+podman run --rm -it --name helios -v "$PWD :/workspace" -w /workspace helios-build
 ```
 
 **What the flags mean**
 - `--rm` -> auto‑remove the container when you exit
 - `-it` -> interactive terminal
 - `--name helios` -> friendly name for the container
-- `-v "<your folder>:/workspace"` -> mount your current folder inside the container
+- `-v "<your folder> :/workspace"` -> mount your current folder inside the container
 - `-w /workspace` -> start in `/workspace` inside the container
 - `helios-build` -> the image we built in Step 4
 
@@ -143,13 +143,13 @@ podman machine start
 **Build image**
 
 ```powershell
-podman build -t helios-build -f ./build.dockerfile .
+podman build -t helios-build -f ${projectDir}/build.dockerfile .
 ```
 
 **Run container**
 
 ```bash
-podman run --rm -it --name helios -v "$PWD:/workspace" -w /workspace helios-build
+podman run --rm -it --name helios -v "$PWD: /workspace" -w /workspace helios-build
 ```
 
 ---
