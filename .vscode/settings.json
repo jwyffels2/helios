@@ -1,10 +1,10 @@
 {
-  // Editing & consistency
-  "editor.insertSpaces": true,
-  "files.trimTrailingWhitespace": true,
-  "files.insertFinalNewline": true,
-  "editor.indentSize" : 4,
-  "editor.tabSize": 4,
-  "editor.detectIndentation": false,
+    // Editing & consistency
+    "editor.insertSpaces": true,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "editor.indentSize" : 4,
+    "editor.tabSize": 4,
+    "editor.detectIndentation": false,
 
 }
