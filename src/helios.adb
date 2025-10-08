@@ -9,6 +9,6 @@ procedure helios is
    Text : String := "Hello Ada World!";
 begin
    Print (Text);
-   Text := "xxxxx xxx xxxxx.";
+   Text := "xxxxx yyy xxxxx.";
    Print (Text);
 end helios;
