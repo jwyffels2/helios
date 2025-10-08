@@ -15,4 +15,3 @@ WORKDIR /home/ubuntu
 ENV HOME=/home/ubuntu
 
 RUN alr --non-interactive toolchain --select
-

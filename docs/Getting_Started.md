@@ -23,7 +23,7 @@ This guide explains *what* you’re doing and *why*, then gives you simple copy�
 git clone https://github.com/jwyffels2/helios.git
 ```
 
-## Step 1 — Windows quick setup (auto‑install)
+## Step 1 - Windows quick setup (auto‑install)
 Run the script to install **WSL2**, **Podman**, and **Alire**:
 
 ```powershell
@@ -34,7 +34,7 @@ ${projectDir}/Windows_Dependencies.bat
 
 ---
 
-## Step 2 — Create a Podman machine (Mac & Windows)
+## Step 2 - Create a Podman machine (Mac & Windows)
 Do this **once** to set up Podman’s Linux VM:
 
 ```bash
@@ -45,7 +45,7 @@ podman machine init
 
 ---
 
-## Step 3 — Start the machine when needed
+## Step 3 - Start the machine when needed
 Each time you want to use Podman (or after a reboot):
 
 ```bash
@@ -56,7 +56,7 @@ podman machine start
 
 ---
 
-## Step 4 — Build your image
+## Step 4 - Build your image
 We’ll build an image named `helios-build` using a `build.dockerfile` in the project folder.
 
 **What the flags mean**
@@ -73,7 +73,7 @@ podman build -t helios-build -f ./build.dockerfile .
 
 ---
 
-## Step 5 — Run the container (interactive, with your code mounted)
+## Step 5 - Run the container (interactive, with your code mounted)
 This starts a container you can interact with, and mounts your current folder into the container at `/workspace`.
 
 **Run Container With Volume Attached:**
@@ -93,7 +93,7 @@ podman run --rm -it --name helios -v "$PWD :/workspace" -w /workspace helios-bui
 
 ---
 
-## Step 6 — Make VS Code use Podman (not Docker)
+## Step 6 - Make VS Code use Podman (not Docker)
 Open **VS Code -> Command Palette -> Preferences: Open User Settings (JSON)** and add:
 
 ```json
@@ -108,7 +108,7 @@ Open **VS Code -> Command Palette -> Preferences: Open User Settings (JSON)** an
 - Uses Podman for both single containers and Compose‑style projects.
 ---
 
-## Step 7 — Quick “did it work?” checks
+## Step 7 - Quick “did it work?” checks
 Run any of these to verify things are set up:
 
 ```bash
