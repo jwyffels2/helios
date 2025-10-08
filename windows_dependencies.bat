@@ -22,6 +22,7 @@ if errorlevel 1 (
 
 :: --- Prefer WSL2 ---
 echo [INFO] Setting default WSL version to %WSL_VERSION%...
+wsl --update
 wsl --set-default-version %WSL_VERSION% >nul 2>&1
 
 
