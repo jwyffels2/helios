@@ -17,7 +17,8 @@
 				"aaron-bond.better-comments",
 				"Adacore.ada",
 				"tamasfe.even-better-toml",
-				"ms-vscode.cpptools"
+				"ms-vscode.cpptools",
+				"AdaCore.ada"
 			]
 		}
 	}
