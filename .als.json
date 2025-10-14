@@ -1,0 +1,9 @@
+{
+    "documentationStyle": "gnat",
+    "foldComments": true,
+    "insertWithClauses": true,
+    "namedNotationThreshold": 3,
+    "projectFile": "./helios.gpr",
+    "useCompletionSnippets": true,
+    "useGnatformat": true
+}
