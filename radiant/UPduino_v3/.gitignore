@@ -1,0 +1,13 @@
+/*
+
+!.gitignore
+!README.md
+
+!source/
+source/*
+!source/impl_1.xcf
+
+!*.vhd
+!*.rdf
+!*.pdc
+!*.bin
