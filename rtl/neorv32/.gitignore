@@ -1,0 +1,34 @@
+# generated app files
+*.bin
+*.coe
+*.mem
+*.mif
+*.o
+*.elf
+*.asm
+*.out
+*.hex
+*_image.vhd
+*.ghw
+build/
+
+# keep default VHDL memory images
+!rtl/core/*_image.vhd
+
+# logs
+*.gdb_history
+*.log
+
+# host executables
+sw/image_gen/image_gen
+*.exe
+*.cf
+
+# temporary files and folders
+*.bak
+*.tmp
+~*
+
+# generated documentation stuff
+/docs/doxygen_build/
+/docs/public/
