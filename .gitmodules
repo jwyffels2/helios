@@ -1,0 +1,3 @@
+[submodule "helios-neorv32-setups"]
+	path = helios-neorv32-setups
+	url = https://github.com/jwyffels2/helios-neorv32-setups.git
