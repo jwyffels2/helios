@@ -13,7 +13,8 @@
     "ms-vscode.remote-explorer",
     "ms-sarifvscode.sarif-viewer",
     "ms-vscode-remote.remote-wsl",
-    "davidanson.vscode-markdownlint"
+    "davidanson.vscode-markdownlint",
+    "ms-vscode.vscode-serial-monitor"
 
   ],
   "unwantedRecommendations": [
