@@ -18,7 +18,8 @@
 				"Adacore.ada",
 				"tamasfe.even-better-toml",
 				"ms-vscode.cpptools",
-				"AdaCore.ada"
+				"AdaCore.ada",
+				"ms-vscode.vscode-serial-monitor"
 			]
 		}
 	}
