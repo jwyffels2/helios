@@ -4,6 +4,14 @@ version = "0.1.0-dev"
 
 authors = ["Justin Wyffels"]
 maintainers = ["Justin Wyffels <justinwyffels@gmail.com>"]
-maintainers-logins = ["woobler"]
+maintainers-logins = ["jwyffels2"]
 
 executables = ["helios"]
+
+[[depends-on]]
+gnat_riscv64_elf = "14.2.1"
+bare_runtime = "14.0.0"
+
+[gpr-set-externals]
+BARE_RUNTIME_SWITCHES = "-march=rv32i_zicsr_zifencei -mabi=ilp32"
+
