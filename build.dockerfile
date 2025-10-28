@@ -28,11 +28,11 @@ RUN curl -L -o /tmp/alr.zip \
 
 RUN alr index --update-all && alr toolchain --select gnat_riscv64_elf="${RISC_COMPILER_VERSION}" gprbuild="${GPRBUILD_VERSION}"
 
-# Resolve the actual toolchain dir once and give it a stable path
+# Resolve the actual toolchain dir once and give it a stable path using symlinks
 RUN set -eux; \
     dir="$(find "$HOME/.local/share/alire/toolchains" -maxdepth 1 -mindepth 1 -name "gnat_riscv64_elf_${RISC_COMPILER_VERSION}*" -print -quit)"; \
     [ -n "$dir" ] || { echo "No toolchain found for ${RISC_COMPILER_VERSION}"; exit 1; }; \
     ln -s "$dir" /opt/riscv
 
-# Persist PATH for all subsequent layers and at runtime
+# Persist PATH for all subsequent layers and at runtime using the previously created symlink
 ENV PATH="/opt/riscv/bin:${PATH}"
