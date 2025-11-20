@@ -205,22 +205,11 @@ begin
       mext_irq_i   => '0'
     );
 
-  ---------------------------------------------------------------------------
-  -- GPIO mapping
-  --  - We are not using external GPIO inputs -> tie them low.
-  --  - Pass NEORV32 GPIOs through, but override gpio_o(7) with clk_i
-  --    so you get a 100 MHz clock on LED7 (and gpio_o[7] pin).
-  ---------------------------------------------------------------------------
 
+  -- No external GPIO inputs
   gpio_core_i <= (others => '0');
 
-  -- Local copy of core GPIO
-  gpio_o_int <= gpio_core_o;
+  -- Directly expose core GPIOs
+  gpio_o <= gpio_core_o;
 
-  -- Pass-through for all bits except bit 7
-  gpio_o(6 downto 0)  <= gpio_o_int(6 downto 0);
-  gpio_o(31 downto 8) <= gpio_o_int(31 downto 8);
-
-  -- New "clock on GPIO" (this is what your constraints see as gpio_o[7])
-  gpio_o(7) <= clk_i;
 end architecture rtl;
