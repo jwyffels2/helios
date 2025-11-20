@@ -10,17 +10,17 @@ if /I "%~1"=="--create" (
     set DO_CREATE=1
 )
 
-pushd ".\third_party\helios-neorv32-setups\vivado\basys3-a7-test-setup"
+pushd ".\rtl\"
 
 if "%DO_CREATE%"=="1" (
-    echo Running create_project.tcl ...
-    call vivado -mode batch -source "create_project.tcl"
+    echo Running build.tcl ...
+    call vivado -mode batch -source ".\build.tcl"
 ) else (
-    echo "Skipping create_project.tcl (default)."
+    echo "Skipping build.tcl (default)."
 )
 
-echo "Running program_bitstream.tcl ..."
-call vivado -mode batch -source "program_bitstream.tcl"
+echo "Running program.tcl ..."
+call vivado -mode batch -source ".\program.tcl"
 
 popd
 popd

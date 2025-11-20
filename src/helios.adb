@@ -1,15 +1,13 @@
 with Ada.Text_IO;
 with Uart0;
 with Gnat_Exit;
-with neorv32;          use neorv32;
+with neorv32; use neorv32;
 with neorv32.GPIO;
 with neorv32.SYSINFO;
 with neorv32.GPTMR;
-
 procedure Helios is
 
-   Clock_Hz : constant UInt32 :=
-     neorv32.SYSINFO.SYSINFO_Periph.CLK;  -- e.g. 100_000_000
+   Clock_Hz : constant UInt32 := neorv32.SYSINFO.SYSINFO_Periph.CLK;  -- e.g. 100_000_000
 
    -- GPTMR prescaler = f/128  (PRSC = 4 according to NEORV32 docs)
    Ticks_Per_Second : constant UInt32 := Clock_Hz / 128;
