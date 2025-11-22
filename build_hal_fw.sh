@@ -13,7 +13,7 @@ alr build
 
 riscv64-elf-objcopy -O binary ./bin/helios ./bin/helios.bin
 truncate -s %4 ./bin/helios.bin
-image_gen -app_bin bin/helios.bin bin/helios.exe
+image_gen -i bin/helios.bin -o bin/helios.exe -t app_bin
 
 [ -f "$PWD/bin/helios.exe" ] || { echo "Error: Could Not Find Compiled Binary at $PWD/bin/helios.exe " >&2; exit 1; }
 echo $PWD/bin/helios.exe
