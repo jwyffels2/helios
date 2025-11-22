@@ -20,7 +20,7 @@ entity helios is
     uart0_rxd_i : in  std_ulogic;
     uart0_txd_o : out std_ulogic;
     gpio_o      : out std_ulogic_vector(31 downto 0);
-    cam_clk_o   : out std_ulogic  -- dedicated 24MHz clock
+    pwm_o       : out std_ulogic_vector(15 downto 0)
   );
 end entity helios;
 
@@ -33,22 +33,22 @@ architecture rtl of helios is
   signal gpio_core_o : std_ulogic_vector(31 downto 0);
   signal gpio_core_i : std_ulogic_vector(31 downto 0);
 
-  -- Local copy of core GPIO output so we can override one bit
-  signal gpio_o_int  : std_ulogic_vector(31 downto 0);
+  -- Internal PWM between NEORV32 and wrapper
+  signal pwm_core_o  : STD_ULOGIC_VECTOR(15 downto 0);
 
   -- Camera Mapping
 
-  signal cam_clk_24   : std_logic;
-  signal cam_clk_lock : std_logic;
+--   signal cam_clk_24   : std_logic;
+--   signal cam_clk_lock : std_logic;
 
-  component cam_clk
-    port (
-      clk_out : out std_logic;
-      reset   : in  std_logic;
-      locked  : out std_logic;
-      clk_in  : in  std_logic
-    );
-  end component;
+--   component cam_clk
+--     port (
+--       clk_out : out std_logic;
+--       reset   : in  std_logic;
+--       locked  : out std_logic;
+--       clk_in  : in  std_logic
+--     );
+--   end component;
 
 begin
 
@@ -57,21 +57,21 @@ begin
   ---------------------------------------------------------------------------
   rstn_core <= not rstn_i;
 
-  ---------------------------------------------------------------------------
-  -- Add Camera
-  ---------------------------------------------------------------------------
-  u_cam_clk : cam_clk
-    port map (
-      clk_out => cam_clk_24,
-      reset   => not rstn_core, -- active-high reset
-      locked  => cam_clk_lock,
-      clk_in  => clk_i
-    );
+--   ---------------------------------------------------------------------------
+--   -- Add Camera
+--   ---------------------------------------------------------------------------
+--   u_cam_clk : cam_clk
+--     port map (
+--       clk_out => cam_clk_24,
+--       reset   => not rstn_core, -- active-high reset
+--       locked  => cam_clk_lock,
+--       clk_in  => clk_i
+--     );
 
-  cam_clk_o <= cam_clk_24;
+--   cam_clk_o <= cam_clk_24;
 
   ---------------------------------------------------------------------------
-  -- Instantiate NEORV32 SoC top (unmodified neorv32_top)
+  -- Instantiate NEORV32 SoC top
   ---------------------------------------------------------------------------
   u_neorv32 : entity neorv32.neorv32_top
     generic map (
@@ -83,7 +83,7 @@ begin
       IO_UART0_EN      => true,
       IO_UART0_RX_FIFO => 1,
       IO_UART0_TX_FIFO => 1,
-
+      IO_CLINT_EN      => true,
 
       IO_GPTMR_EN      => true,
 
@@ -99,7 +99,9 @@ begin
     -- CPU extensions (optional but nice to match your old setup)
     RISCV_ISA_C      => true,
     RISCV_ISA_M      => true,
-    RISCV_ISA_Zicntr => true
+    RISCV_ISA_Zicntr => true,
+
+    IO_PWM_NUM_CH => 1
 
     -- All other generics use defaults
 
@@ -186,8 +188,8 @@ begin
       onewire_i    => '1',
       onewire_o    => open,
 
-      -- PWM (unused externally)
-      pwm_o        => open,
+      -- PWM (used externally)
+      pwm_o => pwm_core_o,
 
       -- CFS (unused)
       cfs_in_i     => (others => '0'),
@@ -209,7 +211,7 @@ begin
   -- No external GPIO inputs
   gpio_core_i <= (others => '0');
 
-  -- Directly expose core GPIOs
   gpio_o <= gpio_core_o;
+  pwm_o <= pwm_core_o;
 
 end architecture rtl;

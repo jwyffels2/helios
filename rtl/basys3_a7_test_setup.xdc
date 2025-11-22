@@ -31,8 +31,10 @@ set_property PACKAGE_PIN U14 [get_ports {gpio_o[6]}]
 #set_property PACKAGE_PIN B16 [get_ports {gpio_o[7]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 
-set_property PACKAGE_PIN B16 [get_ports cam_clk_o]
-set_property IOSTANDARD LVCMOS33 [get_ports cam_clk_o]
+
+set_property PACKAGE_PIN B16 [get_ports pwm_o[0]]
+set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
+
 
 ## Bitstream configuration
 set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]

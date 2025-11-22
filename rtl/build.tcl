@@ -45,30 +45,30 @@ switch $board {
 # Create project in work/
 create_project -part $a7part $a7prj $outputdir
 
-# Add camera clock IP
-set camclk_xci [file normalize [file join $script_dir ip cam_clk cam_clk.xci]]
+# # Add camera clock IP
+# set camclk_xci [file normalize [file join $script_dir ip cam_clk cam_clk.xci]]
 
-if {![file exists $camclk_xci]} {
-    error "cam_clk IP not found at $camclk_xci"
-}
+# if {![file exists $camclk_xci]} {
+#     error "cam_clk IP not found at $camclk_xci"
+# }
 
-add_files $camclk_xci
+# add_files $camclk_xci
 
-# Make sure IP is up-to-date and not locked
-upgrade_ip [get_ips cam_clk]
-reset_target all [get_ips cam_clk]
+# # Make sure IP is up-to-date and not locked
+# upgrade_ip [get_ips cam_clk]
+# reset_target all [get_ips cam_clk]
 
-# Regenerate all IP output products (DCP, XDC, etc.)
-generate_target all [get_ips cam_clk]
+# # Regenerate all IP output products (DCP, XDC, etc.)
+# generate_target all [get_ips cam_clk]
 
-# (Optional but nice): explicitly run OOC synth for the IP once
-if { [llength [get_runs cam_clk_synth_1 -quiet]] == 0 } {
-    create_ip_run [get_ips cam_clk]
-}
-launch_runs cam_clk_synth_1
-wait_on_run cam_clk_synth_1
+# # (Optional but nice): explicitly run OOC synth for the IP once
+# if { [llength [get_runs cam_clk_synth_1 -quiet]] == 0 } {
+#     create_ip_run [get_ips cam_clk]
+# }
+# launch_runs cam_clk_synth_1
+# wait_on_run cam_clk_synth_1
 
-#! Finish Creating Camera Clock
+# #! Finish Creating Camera Clock
 
 set_property board_part digilentinc.com:${board}:part0:1.2 [current_project]
 set_property target_language VHDL [current_project]
