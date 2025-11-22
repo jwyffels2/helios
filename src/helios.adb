@@ -5,6 +5,7 @@ with neorv32; use neorv32;
 with neorv32.GPIO;
 with neorv32.SYSINFO;
 with neorv32.GPTMR;
+with neorv32.PWM;
 procedure Helios is
 
    Clock_Hz : constant UInt32 := neorv32.SYSINFO.SYSINFO_Periph.CLK;  -- e.g. 100_000_000
@@ -25,7 +26,6 @@ procedure Helios is
       neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_IRQ_CLR := 1;
 
       -- configure mode and prescaler
-      neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_MODE := 0;  -- single-shot
       neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_PRSC := 4;  -- f/128
 
       -- enable the timer
@@ -53,10 +53,11 @@ begin
    Ada.Text_IO.Put_Line ("Hello");
 
     neorv32.GPIO.GPIO_Periph.PORT_OUT := LED_Mask;
-
    loop
       Timer (1);
       -- clean toggle of only the LED bits
       neorv32.GPIO.GPIO_Periph.PORT_OUT := neorv32.GPIO.GPIO_Periph.PORT_OUT xor LED_Mask;
+
+
    end loop;
 end Helios;
