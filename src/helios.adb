@@ -50,14 +50,5 @@ procedure Helios is
    end Timer;
 
 begin
-   Ada.Text_IO.Put_Line ("Hello");
-
-    neorv32.GPIO.GPIO_Periph.PORT_OUT := LED_Mask;
-   loop
-      Timer (1);
-      -- clean toggle of only the LED bits
-      neorv32.GPIO.GPIO_Periph.PORT_OUT := neorv32.GPIO.GPIO_Periph.PORT_OUT xor LED_Mask;
-
-
-   end loop;
+    Ada.Text_IO.Put_Line ("Hello World!");
 end Helios;
