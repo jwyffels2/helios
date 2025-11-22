@@ -1,5 +1,7 @@
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
 
 library neorv32;
 use neorv32.neorv32_package.all;
@@ -41,6 +43,9 @@ architecture rtl of helios is
   signal cam_clk_24   : std_logic;
   signal cam_clk_lock : std_logic;
 
+  -- LED clock divider signals
+  signal led_divided : std_logic := '0';
+
   component cam_clk
     port (
       clk_out : out std_logic;
@@ -49,6 +54,8 @@ architecture rtl of helios is
       clk_in  : in  std_logic
     );
   end component;
+
+  signal div_counter : unsigned(24 downto 0) := (others => '0');
 
 begin
 
@@ -69,7 +76,21 @@ begin
     );
 
   cam_clk_o <= cam_clk_24;
+---------------------------------------------------------------------------
+  -- Clock Divider: Blink LED using 24 MHz camera clock
+  ---------------------------------------------------------------------------
+  process(cam_clk_24)
+  begin
+    if rising_edge(cam_clk_24) then
+      div_counter <= div_counter + 1;
 
+      if div_counter = 24_000_000 - 1 then
+        div_counter  <= (others => '0');
+        led_divided  <= not led_divided;
+      end if;
+
+    end if;
+  end process;
   ---------------------------------------------------------------------------
   -- Instantiate NEORV32 SoC top (unmodified neorv32_top)
   ---------------------------------------------------------------------------
@@ -206,10 +227,13 @@ begin
     );
 
 
-  -- No external GPIO inputs
+   -- No external GPIO inputs
   gpio_core_i <= (others => '0');
 
-  -- Directly expose core GPIOs
-  gpio_o <= gpio_core_o;
+  -- Override one GPIO bit with the LED divider
+ gpio_o_int <= gpio_core_o;
+ gpio_o_int(8) <= led_divided;  -- assign to unused GPIO
+ gpio_o <= gpio_o_int;
+
 
 end architecture rtl;

@@ -4,7 +4,7 @@
     "xci_name": "cam_clk",
     "component_reference": "xilinx.com:ip:clk_wiz:6.0",
     "ip_revision": "16",
-    "gen_directory": "./cam_clk.gen",
+    "gen_directory": "cam_clk.gen",
     "parameters": {
       "component_parameters": {
         "Component_Name": [ { "value": "cam_clk", "resolve_type": "user", "usage": "all" } ],
@@ -599,7 +599,7 @@
         "IPCONTEXT": [ { "value": "IP_Flow" } ],
         "IPREVISION": [ { "value": "16" } ],
         "MANAGED": [ { "value": "TRUE" } ],
-        "OUTPUTDIR": [ { "value": "./cam_clk.gen" } ],
+        "OUTPUTDIR": [ { "value": "cam_clk.gen" } ],
         "SELECTEDSIMMODEL": [ { "value": "" } ],
         "SHAREDDIR": [ { "value": "." } ],
         "SWVERSION": [ { "value": "2025.1" } ],
