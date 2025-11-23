@@ -20,7 +20,7 @@ entity helios is
     uart0_rxd_i : in  std_ulogic;
     uart0_txd_o : out std_ulogic;
     gpio_o      : out std_ulogic_vector(31 downto 0);
-    pwm_o       : out std_ulogic_vector(15 downto 0)
+    pwm_o       : out std_ulogic_vector(31 downto 0)
   );
 end entity helios;
 
@@ -34,7 +34,7 @@ architecture rtl of helios is
   signal gpio_core_i : std_ulogic_vector(31 downto 0);
 
   -- Internal PWM between NEORV32 and wrapper
-  signal pwm_core_o  : STD_ULOGIC_VECTOR(15 downto 0);
+  signal pwm_core_o  : STD_ULOGIC_VECTOR(31 downto 0);
 
   -- Camera Mapping
 
@@ -85,7 +85,7 @@ begin
       IO_UART0_TX_FIFO => 1,
       IO_CLINT_EN      => true,
 
-      IO_GPTMR_EN      => true,
+      IO_GPTMR_NUM      => 1,
 
     -- Boot configuration: force internal UART bootloader
     BOOT_MODE_SELECT => 0,
@@ -101,7 +101,7 @@ begin
     RISCV_ISA_M      => true,
     RISCV_ISA_Zicntr => true,
 
-    IO_PWM_NUM_CH => 1
+    IO_PWM_NUM => 1
 
     -- All other generics use defaults
 

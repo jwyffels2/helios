@@ -5,50 +5,29 @@ with neorv32; use neorv32;
 with neorv32.GPIO;
 with neorv32.SYSINFO;
 with neorv32.GPTMR;
-with neorv32.PWM;
+with neorv32.PWM; use neorv32.PWM;
 procedure Helios is
-
-   Clock_Hz : constant UInt32 := neorv32.SYSINFO.SYSINFO_Periph.CLK;  -- e.g. 100_000_000
-
-   -- GPTMR prescaler = f/128  (PRSC = 4 according to NEORV32 docs)
-   Ticks_Per_Second : constant UInt32 := Clock_Hz / 128;
-
-   LED_Mask : constant neorv32.UInt32 :=
-     2#0000_0000_0000_0000_0000_0000_1000_1111#;
-
-   -- wait for ~1 second using GPTMR in single-shot mode
-   procedure Wait_One_Second is
-   begin
-      -- set threshold
-      neorv32.GPTMR.GPTMR_Periph.THRES := Ticks_Per_Second;
-
-      -- clear any old pending interrupt
-      neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_IRQ_CLR := 1;
-
-      -- configure mode and prescaler
-      neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_PRSC := 4;  -- f/128
-
-      -- enable the timer
-      neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_EN := 1;
-
-      -- poll until threshold reached
-      while neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_IRQ_PND = 0 loop
-         null;
-      end loop;
-
-      -- ack/clear pending flag (and optionally stop timer)
-      neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_IRQ_CLR := 1;
-      neorv32.GPTMR.GPTMR_Periph.CTRL.GPTMR_CTRL_EN      := 0;
-   end Wait_One_Second;
-
-   -- "Seconds" is now N * real timer seconds
-   procedure Timer (Seconds : UInt32) is
-   begin
-      for S in 1 .. Seconds loop
-         Wait_One_Second;
-      end loop;
-   end Timer;
+   --  Constants for ~5 Hz from 100 MHz
+   CLKPRSC_1024 : constant UInt32 := 5;      -- 0b101 -> prescaler = 1024
+   TOP_5HZ      : constant UInt16 := 19531;  -- TOP + 1 = 19532
+   CMP_50PCT    : constant UInt16 := 9766;   -- 50% duty: CMP / (TOP+1)
 
 begin
-    Ada.Text_IO.Put_Line ("Hello World!");
+   --  1) Disable channel 0 while configuring
+   PWM_Periph.ENABLE := PWM_Periph.ENABLE and not 1;  -- clear bit 0
+
+   --  2) Set global clock prescaler to 1024
+   --     Only bits 2..0 are used.
+   PWM_Periph.CLKPRSC := CLKPRSC_1024;
+
+   --  3) Configure channel 0 TOP and CMP
+   PWM_Periph.CHANNEL (0).TOPCMP.TOP := TOP_5HZ;
+   PWM_Periph.CHANNEL (0).TOPCMP.CMP := CMP_50PCT;
+
+   --  4) Normal (non-inverted) polarity on channel 0: clear bit 0
+   PWM_Periph.POLARITY := PWM_Periph.POLARITY and not 1;
+
+   --  5) Enable channel 0
+   PWM_Periph.ENABLE := PWM_Periph.ENABLE or 1;
+
 end Helios;
