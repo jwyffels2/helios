@@ -87,23 +87,23 @@ begin
 
       IO_GPTMR_NUM      => 1,
 
-    -- Boot configuration: force internal UART bootloader
-    BOOT_MODE_SELECT => 0,
+      -- Boot configuration: force internal UART bootloader
+      BOOT_MODE_SELECT => 0,
 
-    -- Instruction/Data memories
-    IMEM_EN          => true,
-    IMEM_SIZE        => 16*1024,
-    DMEM_EN          => true,
-    DMEM_SIZE        => 8*1024,
+      -- Instruction/Data memories
+      IMEM_EN   => true,
+      IMEM_SIZE => 32*1024, -- or 64*1024, etc.
+      DMEM_EN   => true,
+      DMEM_SIZE => 8*1024,
 
-    -- CPU extensions (optional but nice to match your old setup)
-    RISCV_ISA_C      => true,
-    RISCV_ISA_M      => true,
-    RISCV_ISA_Zicntr => true,
+      -- CPU extensions (optional but nice to match your old setup)
+      RISCV_ISA_C      => true,
+      RISCV_ISA_M      => true,
+      RISCV_ISA_Zicntr => true,
 
-    IO_PWM_NUM => 1
+      IO_PWM_NUM => 1
 
-    -- All other generics use defaults
+      -- All other generics use defaults
 
     )
     port map (
