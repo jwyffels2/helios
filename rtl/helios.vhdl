@@ -20,21 +20,32 @@ entity helios is
     uart0_rxd_i : in  std_ulogic;
     uart0_txd_o : out std_ulogic;
     gpio_o      : out std_ulogic_vector(31 downto 0);
-    pwm_o       : out std_ulogic_vector(31 downto 0)
+    pwm_o       : out std_ulogic_vector(31 downto 0);
+    twi_sda_i   : in  STD_ULOGIC;
+    twi_sda_o   : out STD_ULOGIC;
+    twi_scl_i   : in  STD_ULOGIC;
+    twi_scl_o   : out STD_ULOGIC
   );
 end entity helios;
 
 architecture rtl of helios is
 
-  -- Internal reset for NEORV32 (active-low)
-  signal rstn_core   : std_ulogic;
+    -- Internal reset for NEORV32 (active-low)
+    signal rstn_core   : std_ulogic;
 
-  -- Internal GPIO between NEORV32 and wrapper
-  signal gpio_core_o : std_ulogic_vector(31 downto 0);
-  signal gpio_core_i : std_ulogic_vector(31 downto 0);
+    -- Internal GPIO between NEORV32 and wrapper
+    signal gpio_core_o : std_ulogic_vector(31 downto 0);
+    signal gpio_core_i : std_ulogic_vector(31 downto 0);
 
-  -- Internal PWM between NEORV32 and wrapper
-  signal pwm_core_o  : STD_ULOGIC_VECTOR(31 downto 0);
+    -- Internal PWM between NEORV32 and wrapper
+    signal pwm_core_o     : STD_ULOGIC_VECTOR(31 downto 0);
+
+    -- Internal TWI Between NEORV32 and wrapper
+    signal twi_sda_core_i : STD_ULOGIC;
+    signal twi_sda_core_o : STD_ULOGIC;
+    signal twi_scl_core_i : STD_ULOGIC;
+    signal twi_scl_core_o : STD_ULOGIC;
+
 
   -- Camera Mapping
 
@@ -101,7 +112,12 @@ begin
       RISCV_ISA_M      => true,
       RISCV_ISA_Zicntr => true,
 
-      IO_PWM_NUM => 1
+      -- Enable PWM and ENABLE precisely one PWM Channel
+      IO_PWM_NUM => 1,
+
+      -- Enable TWI
+
+      IO_TWI_EN => true
 
       -- All other generics use defaults
 
@@ -172,11 +188,11 @@ begin
       sdi_dat_i    => '0',
       sdi_csn_i    => '1',
 
-      -- TWI (unused)
-      twi_sda_i    => '1',
-      twi_sda_o    => open,
-      twi_scl_i    => '1',
-      twi_scl_o    => open,
+      -- TWI used for camera communication
+      twi_sda_i    => twi_sda_core_i,
+      twi_sda_o    => twi_sda_core_o,
+      twi_scl_i    => twi_scl_core_i,
+      twi_scl_o    => twi_scl_core_o,
 
       -- TWD (unused)
       twd_sda_i    => '1',
@@ -209,9 +225,14 @@ begin
 
 
   -- No external GPIO inputs
-  gpio_core_i <= (others => '0');
+    gpio_core_i <= (others => '0');
 
-  gpio_o <= gpio_core_o;
-  pwm_o <= pwm_core_o;
+    gpio_o           <= gpio_core_o;
+    pwm_o            <= pwm_core_o;
+    twi_sda_core_i   <= twi_sda_i;
+    twi_sda_o        <= twi_sda_core_o;
+    twi_scl_core_i   <= twi_scl_i;
+    twi_scl_o        <= twi_scl_core_o;
+
 
 end architecture rtl;
