@@ -46,40 +46,12 @@ architecture rtl of helios is
     signal twi_scl_core_i : STD_ULOGIC;
     signal twi_scl_core_o : STD_ULOGIC;
 
-
-  -- Camera Mapping
-
---   signal cam_clk_24   : std_logic;
---   signal cam_clk_lock : std_logic;
-
---   component cam_clk
---     port (
---       clk_out : out std_logic;
---       reset   : in  std_logic;
---       locked  : out std_logic;
---       clk_in  : in  std_logic
---     );
---   end component;
-
 begin
 
   ---------------------------------------------------------------------------
   -- Reset: convert active-high push button to active-low NEORV32 reset
   ---------------------------------------------------------------------------
   rstn_core <= not rstn_i;
-
---   ---------------------------------------------------------------------------
---   -- Add Camera
---   ---------------------------------------------------------------------------
---   u_cam_clk : cam_clk
---     port map (
---       clk_out => cam_clk_24,
---       reset   => not rstn_core, -- active-high reset
---       locked  => cam_clk_lock,
---       clk_in  => clk_i
---     );
-
---   cam_clk_o <= cam_clk_24;
 
   ---------------------------------------------------------------------------
   -- Instantiate NEORV32 SoC top
