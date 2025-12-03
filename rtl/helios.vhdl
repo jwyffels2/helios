@@ -1,6 +1,6 @@
 library ieee;
 use ieee.std_logic_1164.all;
-
+use ieee.numeric_std.all;
 library neorv32;
 use neorv32.neorv32_package.all;
 
@@ -24,7 +24,13 @@ entity helios is
     twi_sda_i   : in  STD_ULOGIC;
     twi_sda_o   : out STD_ULOGIC;
     twi_scl_i   : in  STD_ULOGIC;
-    twi_scl_o   : out STD_ULOGIC
+    twi_scl_o   : out STD_ULOGIC;
+
+    vga_hs      : out std_logic;
+    vga_vs      : out std_logic;
+    vga_r       : out std_logic_vector(3 downto 0);
+    vga_g       : out std_logic_vector(3 downto 0);
+    vga_b       : out std_logic_vector(3 downto 0)
   );
 end entity helios;
 
@@ -45,6 +51,19 @@ architecture rtl of helios is
     signal twi_sda_core_o : STD_ULOGIC;
     signal twi_scl_core_i : STD_ULOGIC;
     signal twi_scl_core_o : STD_ULOGIC;
+
+
+  -- >>> VGA internal signals <<<
+  signal vga_clk    : std_logic; -- will be driven by clock divider for now
+  signal pix_x      : std_logic_vector(9 downto 0);
+  signal pix_y      : std_logic_vector(9 downto 0);
+  signal vid_on     : std_logic;
+  signal vga_r_int  : std_logic_vector(3 downto 0);
+  signal vga_g_int  : std_logic_vector(3 downto 0);
+  signal vga_b_int  : std_logic_vector(3 downto 0);
+
+  -- simple /4 divider from 100 MHz to ~25 MHz
+  signal vga_div_cnt : unsigned(1 downto 0) := (others => '0');
 
 begin
 
@@ -199,7 +218,7 @@ begin
   -- No external GPIO inputs
     gpio_core_i <= (others => '0');
 
-    gpio_o           <= gpio_core_o;
+    --gpio_o           <= gpio_core_o;
     pwm_o            <= pwm_core_o;
     twi_sda_core_i   <= twi_sda_i;
     twi_sda_o        <= twi_sda_core_o;
@@ -207,4 +226,79 @@ begin
     twi_scl_o        <= twi_scl_core_o;
 
 
+  ---------------------------------------------------------------------------
+  -- >>> VGA: use PWM(0) as pixel clock <<<
+  ---------------------------------------------------------------------------
+  -- vga_clk <= std_logic(pwm_core_o(0));  -- PWM(0) drives helios_vga clock
+
+  ---------------------------------------------------------------------------
+  -- >>> VGA: temporary clock divider from 100 MHz (for debug) <<<
+  ---------------------------------------------------------------------------
+  process(clk_i, rstn_core)
+  begin
+    if rstn_core = '0' then
+      vga_div_cnt <= (others => '0');
+      vga_clk     <= '0';
+    elsif rising_edge(clk_i) then
+      vga_div_cnt <= vga_div_cnt + 1;
+      vga_clk     <= vga_div_cnt(1);  -- 100 MHz / 4 = 25 MHz
+    end if;
+  end process;
+
+  -- VGA timing core (helios_vga)
+  u_vga : entity work.helios_vga
+    generic map (
+      -- 640x480@60 timing
+      H_back_porch     => 48,
+      H_display        => 640,
+      H_front_porch    => 16,
+      H_retrace        => 96,
+      V_back_porch     => 33,
+      V_display        => 480,
+      V_front_porch    => 10,
+      V_retrace        => 2,
+      Color_bits       => 4,
+      H_sync_polarity  => '0',
+      V_sync_polarity  => '0',
+      H_counter_size   => 10,
+      V_counter_size   => 10
+    )
+    port map (
+      i_vid_clk     => vga_clk,
+      i_rstb        => rstn_core, -- active-low reset
+
+      o_h_sync      => vga_hs,
+      o_v_sync      => vga_vs,
+
+      o_pixel_x     => pix_x,
+      o_pixel_y     => pix_y,
+      o_vid_display => vid_on,
+
+      i_red_in      => vga_r_int,
+      i_green_in    => vga_g_int,
+      i_blue_in     => vga_b_int,
+
+      o_red_out     => vga_r,
+      o_green_out   => vga_g,
+      o_blue_out    => vga_b
+    );
+
+  ---------------------------------------------------------------------------
+  -- Simple test pattern (combinational) so you can SEE something
+  ---------------------------------------------------------------------------
+  process(pix_x, pix_y, vid_on)
+  begin
+    if vid_on = '1' then
+      -- crude vertical color bars based on X
+      vga_r_int <= (others => pix_x(5));  -- red in some columns
+      vga_g_int <= (others => pix_x(6));  -- green in others
+      vga_b_int <= (others => pix_x(7));  -- blue in others
+    else
+      vga_r_int <= (others => '0');
+      vga_g_int <= (others => '0');
+      vga_b_int <= (others => '0');
+    end if;
+  end process;
+-- Debug: mirror HS/VS to LEDs (gpio_o[0] = HS, gpio_o[1] = VS)
+    gpio_o <= (31 downto 2 => '0', 1 => vga_vs, 0 => vga_hs);
 end architecture rtl;
