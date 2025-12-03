@@ -1,0 +1,18 @@
+# helios_env/alire.toml
+name = "helios_env"
+version = "0.1.0-dev"
+description = "Common toolchain + HAL deps for Helios"
+
+# No executables if you dont want any
+executables = []
+
+[[depends-on]]
+gnat_riscv64_elf = "14.2.1"
+bare_runtime      = "14.0.0"
+neorv32_hal       = "*"
+
+[[pins]]
+neorv32_hal = { path = "../third_party/helios-neorv32-setups/neorv32-hal" }
+
+[gpr-set-externals]
+BARE_RUNTIME_SWITCHES = "-march=rv32i_zicsr_zifencei -mabi=ilp32"

@@ -1,0 +1,17 @@
+name = "tests"
+description = "testing for helios"
+version = "0.1.0-dev"
+
+authors = ["Justin Wyffels"]
+maintainers = ["Justin Wyffels <example@example.com>"]
+licenses = "MIT OR Apache-2.0 WITH LLVM-exception"
+website = ""
+tags = []
+
+executables = ["tests"]
+
+[[depends-on]]
+helios_env = "*"
+
+[[pins]]
+helios_env = {path = "../helios_env"}
