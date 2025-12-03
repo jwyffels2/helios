@@ -47,7 +47,8 @@ create_project -part $a7part $a7prj $outputdir
 
 set_property board_part digilentinc.com:${board}:part0:1.2 [current_project]
 set_property target_language VHDL [current_project]
-
+# Add this line:
+set_property vhdl_version VHDL_2008 [current_fileset]
 # --------------------------------------------------------------------
 # NEORV32 RTL sources
 #   Assumes NEORV32 at: ..\third_party\helios-neorv32-setups\neorv32
@@ -77,6 +78,18 @@ if {[file isdirectory [file join $neorv32_rtl_dir system_integration]]} {
         set_property library neorv32 [get_files $neorv32_sys_files]
     }
 }
+
+
+# --------------------------------------------------------------------
+# helios VGA timing core
+#   File: C:\helios\rtl\helios_vga.vhdl
+# --------------------------------------------------------------------
+set helios_vga_vhdl [file join $script_dir helios_vga.vhdl]
+if {![file exists $helios_vga_vhdl]} {
+    error "helios_vga VHDL file not found: $helios_vga_vhdl"
+}
+add_files $helios_vga_vhdl
+
 
 # --------------------------------------------------------------------
 # Your wrapper top-level (instantiates neorv32_top)
