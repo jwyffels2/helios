@@ -4,6 +4,7 @@ project Helios extends "helios_common.gpr" is
    Build_Profile : Build_Profile_Kind := "development";
    for Source_Dirs use ("src/");
    for Object_Dir use "obj/" & Build_Profile;
+   for Exec_Dir    use "bin";
    for Main       use ("helios.adb");
 
 end Helios;
