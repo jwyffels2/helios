@@ -1,4 +1,9 @@
-/obj/
-/bin/
-/alire/
-/config/
+/obj/*
+/bin/*
+/alire/*
+/config/*
+# Object file
+*.o
+
+# Ada Library Information
+*.ali
