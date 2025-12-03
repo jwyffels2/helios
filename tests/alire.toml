@@ -11,12 +11,7 @@ tags = []
 executables = ["tests"]
 
 [[depends-on]]
-gnat_riscv64_elf = "14.2.1"
-bare_runtime = "14.0.0"
-neorv32_hal = "*"
+helios_env = "*"
 
 [[pins]]
-neorv32_hal = {path = "../third_party/helios-neorv32-setups/neorv32-hal"}
-[gpr-set-externals]
-BARE_RUNTIME_SWITCHES = "-march=rv32i_zicsr_zifencei -mabi=ilp32"
-
+helios_env = {path = "../helios_env"}

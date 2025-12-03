@@ -43,7 +43,6 @@ abstract project Helios_Common is
 
 
    for Create_Missing_Dirs use "True";
-   for Exec_Dir            use "./bin";
    for Target              use "riscv64-elf";
    for Runtime ("Ada")     use Bare_Runtime'Runtime ("Ada");
 
