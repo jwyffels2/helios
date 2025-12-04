@@ -19,40 +19,54 @@ set_property IOSTANDARD LVCMOS33 [get_ports uart0_rxd_i]
 set_property PACKAGE_PIN A18 [get_ports uart0_txd_o]
 set_property IOSTANDARD LVCMOS33 [get_ports uart0_txd_o]
 
-## Optional GPIO outputs (connect to on-board LEDs LD0–LD7)
-set_property PACKAGE_PIN U16 [get_ports {gpio_o[0]}]
-set_property PACKAGE_PIN E19 [get_ports {gpio_o[1]}]
-set_property PACKAGE_PIN U19 [get_ports {gpio_o[2]}]
-set_property PACKAGE_PIN V19 [get_ports {gpio_o[3]}]
-set_property PACKAGE_PIN W18 [get_ports {gpio_o[4]}]
-set_property PACKAGE_PIN U15 [get_ports {gpio_o[5]}]
-set_property PACKAGE_PIN U14 [get_ports {gpio_o[6]}]
-#set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
 
-# RESET PIN
-set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
+#CAMERA HSYNC and VSYNC
+#HSYNC
+set_property PACKAGE_PIN M18 [get_ports {gpio_i[0]}]
+#VSYNC
+set_property PACKAGE_PIN L17 [get_ports {gpio_i[1]}]
 
+#CAMERA DATA PINS
+ #D2
+set_property PACKAGE_PIN A15 [get_ports {gpio_i[2]}]
+ #D3
+set_property PACKAGE_PIN B16 [get_ports {gpio_i[3]}]
+#D4
+set_property PACKAGE_PIN A17 [get_ports {gpio_i[4]}]
+#D5
+set_property PACKAGE_PIN B15 [get_ports {gpio_i[5]}]
+#D6
+set_property PACKAGE_PIN C15 [get_ports {gpio_i[6]}]
+#D7
+set_property PACKAGE_PIN A14 [get_ports {gpio_i[7]}]
+#D8
+set_property PACKAGE_PIN C16 [get_ports {gpio_i[8]}]
+#D9
+set_property PACKAGE_PIN A16 [get_ports {gpio_i[9]}]
 
+#CAMERA PIXEL CLOCK
+set_property PACKAGE_PIN P18 [get_ports {gpio_i[10]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
-
+set_property IOSTANDARD LVCMOS33 [get_ports {gpio_i[*]}]
 
 # Camera External Clock PWM
-set_property PACKAGE_PIN A15 [get_ports pwm_o[0]]
+set_property PACKAGE_PIN K17 [get_ports pwm_o[0]]
+
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
 
 #========================TWI==========================
-# TWI_SDA_I and TWI_SDA_O should be the same pin
-set_property PACKAGE_PIN P17 [get_ports twi_sda_i]
+# CAMERA COMMUNICATION SDA and SCL
+set_property PACKAGE_PIN N17 [get_ports twi_sda_i]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_i]
 
-set_property PACKAGE_PIN P17 [get_ports twi_sda_o]
+set_property PACKAGE_PIN N17 [get_ports twi_sda_o]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_o]
 
 # TWI_SCL_I and TWI_SCL_O should be the same pin
-set_property PACKAGE_PIN N17 [get_ports twi_scl_i]
+set_property PACKAGE_PIN M19 [get_ports twi_scl_i]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_i]
 
-set_property PACKAGE_PIN N17 [get_ports twi_scl_o]
+set_property PACKAGE_PIN M19 [get_ports twi_scl_o]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_o]
 #=====================END OF TWI======================
 
