@@ -54,21 +54,20 @@ set_property PACKAGE_PIN K17 [get_ports pwm_o[0]]
 
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
 
-#========================TWI==========================
-# CAMERA COMMUNICATION SDA and SCL
-set_property PACKAGE_PIN N17 [get_ports twi_sda_i]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_i]
+## ======================== TWI ========================
 
-set_property PACKAGE_PIN N17 [get_ports twi_sda_o]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_o]
+# SDA
+set_property PACKAGE_PIN N17 [get_ports {twi_sda}]
+set_property IOSTANDARD LVCMOS33 [get_ports {twi_sda}]
+set_property PULLUP true [get_ports {twi_sda}]
 
-# TWI_SCL_I and TWI_SCL_O should be the same pin
-set_property PACKAGE_PIN M19 [get_ports twi_scl_i]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_i]
+# SCL
+set_property PACKAGE_PIN M19 [get_ports {twi_scl}]
+set_property IOSTANDARD LVCMOS33 [get_ports {twi_scl}]
+set_property PULLUP true [get_ports {twi_scl}]
 
-set_property PACKAGE_PIN M19 [get_ports twi_scl_o]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_o]
-#=====================END OF TWI======================
+## ======================== END TWI ====================
+
 
 
 

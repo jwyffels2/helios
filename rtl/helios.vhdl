@@ -14,10 +14,8 @@ entity helios is
     gpio_o      : out std_ulogic_vector(31 downto 0);
     gpio_i      : in std_ulogic_vector(31 downto 0);
     pwm_o       : out std_ulogic_vector(31 downto 0);
-    twi_sda_i   : in  STD_ULOGIC;
-    twi_sda_o   : out STD_ULOGIC;
-    twi_scl_i   : in  STD_ULOGIC;
-    twi_scl_o   : out STD_ULOGIC
+    twi_sda : inout std_logic;
+    twi_scl : inout std_logic
   );
 end entity helios;
 
@@ -38,7 +36,8 @@ architecture rtl of helios is
     signal twi_sda_core_o : STD_ULOGIC;
     signal twi_scl_core_i : STD_ULOGIC;
     signal twi_scl_core_o : STD_ULOGIC;
-
+    signal sda_pin : std_logic;
+    signal scl_pin : std_logic;
 begin
 
   ---------------------------------------------------------------------------
@@ -191,10 +190,17 @@ begin
     gpio_core_i <= gpio_i;
     gpio_o           <= gpio_core_o;
     pwm_o            <= pwm_core_o;
-    twi_sda_core_i   <= twi_sda_i;
-    twi_sda_o        <= twi_sda_core_o;
-    twi_scl_core_i   <= twi_scl_i;
-    twi_scl_o        <= twi_scl_core_o;
+------------------------------------------------------------------
+-- SDA Open-Drain Wiring
+------------------------------------------------------------------
+twi_sda <= '0' when (twi_sda_core_o = '0') else 'Z';
+twi_sda_core_i <= twi_sda;
+
+------------------------------------------------------------------
+-- SCL Open-Drain Wiring
+------------------------------------------------------------------
+twi_scl <= '0' when (twi_scl_core_o = '0') else 'Z';
+twi_scl_core_i <= twi_scl;
 
 
 end architecture rtl;
