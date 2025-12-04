@@ -37,23 +37,19 @@ set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 
 
 # Camera External Clock PWM
-set_property PACKAGE_PIN V14 [get_ports pwm_o[0]]
-set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
+set_property PACKAGE_PIN V14 [get_ports pwm_o]
+set_property IOSTANDARD LVCMOS33 [get_ports pwm_o]
 
 #========================TWI==========================
-# TWI_SDA_I and TWI_SDA_O should be the same pin
-set_property PACKAGE_PIN P17 [get_ports twi_sda_i]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_i]
+# Inout SDA
+set_property PACKAGE_PIN P17        [get_ports twi_sda]
+set_property IOSTANDARD LVCMOS33    [get_ports twi_sda]
+set_property PULLUP true            [get_ports twi_sda]
 
-set_property PACKAGE_PIN P17 [get_ports twi_sda_o]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_o]
-
-# TWI_SCL_I and TWI_SCL_O should be the same pin
-set_property PACKAGE_PIN N17 [get_ports twi_scl_i]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_i]
-
-set_property PACKAGE_PIN N17 [get_ports twi_scl_o]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_o]
+# Inout SCL
+set_property PACKAGE_PIN N17        [get_ports twi_scl]
+set_property IOSTANDARD LVCMOS33    [get_ports twi_scl]
+set_property PULLUP true            [get_ports twi_scl]
 #=====================END OF TWI======================
 
 #========================VGA==========================

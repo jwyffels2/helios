@@ -1,0 +1,5 @@
+dependency:helios_env=0.1.0-dev=cd9b7c7b571e084f8d94c37c13d3d528be555a792c6a781db60ea3202cb3983a
+external:LIBRARY_TYPE=default
+external:TESTS_LIBRARY_TYPE=default
+profile:tests=DEVELOPMENT
+switches:tests=-Og,-fdata-sections,-ffunction-sections,-g,-gnatVa,-gnatW8,-gnatw.X,-gnatwa,-gnaty-d,-gnaty3,-gnatyA,-gnatyB,-gnatyI,-gnatyO,-gnatyS,-gnatya,-gnatyb,-gnatyc,-gnatye,-gnatyf,-gnatyh,-gnatyi,-gnatyk,-gnatyl,-gnatym,-gnatyn,-gnatyp,-gnatyr,-gnatyt,-gnatyu,-gnatyx

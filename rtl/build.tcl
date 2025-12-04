@@ -90,6 +90,16 @@ if {![file exists $helios_vga_vhdl]} {
 }
 add_files $helios_vga_vhdl
 
+# --------------------------------------------------------------------
+# helios VGA xbus wrapper
+#   File: C:\helios\rtl\helios_vga_xbus.vhdl
+# --------------------------------------------------------------------
+set helios_vga_xbus_vhdl [file join $script_dir helios_vga_xbus.vhdl]
+if {![file exists $helios_vga_xbus_vhdl]} {
+    error "helios_vga_xbus VHDL file not found: $helios_vga_xbus_vhdl"
+}
+add_files $helios_vga_xbus_vhdl
+
 
 # --------------------------------------------------------------------
 # Your wrapper top-level (instantiates neorv32_top)

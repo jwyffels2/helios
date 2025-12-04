@@ -1,0 +1,3 @@
+gnat_exit.adb:3:22: warning: formal parameter "Code" is not referenced [-gnatwf]
+gnat_exit.adb:5:07: (style) space required [-gnatyt]
+gnat_exit.adb:6:07: (style) space required [-gnatyt]

@@ -1,0 +1,27 @@
+[GENERATED OBJECT FILE]
+b__tests.o
+[PROJECT FILES]
+/workspace/tests/tests.gpr
+20251203030254 c8ee286f9dc215389c584622c6b60d21
+/root/.local/share/alire/builds/bare_runtime_14.0.0_095db6f0/282b01b920f0d5bb2bac604ac6d9e811f26d175144bc99af963e0381e797ee94/target_options.gpr
+20251203025043 8dc86fed16437f813f2b6cadf3692b4c
+/root/.local/share/alire/builds/bare_runtime_14.0.0_095db6f0/282b01b920f0d5bb2bac604ac6d9e811f26d175144bc99af963e0381e797ee94/bare_runtime.gpr
+20251203025043 3cebed4cbd7f916167d456e9dbafad32
+/workspace/third_party/helios-neorv32-setups/neorv32-hal/config/neorv32_hal_config.gpr
+20251203023703 59087118a127a478b02b9b52176fd5cf
+/workspace/third_party/helios-neorv32-setups/neorv32-hal/neorv32_hal.gpr
+20251107024322 8eecfee9dc6a9ee66fe1cfc223bfb444
+[BOUND OBJECT FILES]
+/workspace/tests/obj/development/gnat_exit.o
+/workspace/tests/obj/development/tests.o
+[GENERATED SOURCE FILES]
+b__tests.ads
+b__tests.adb
+b__tests.ali
+[RESULTING OPTIONS]
+-L/workspace/tests/obj/development/
+-L/workspace/tests/obj/development/
+-L/workspace/third_party/helios-neorv32-setups/neorv32-hal/lib/
+-L/root/.local/share/alire/builds/bare_runtime_14.0.0_095db6f0/282b01b920f0d5bb2bac604ac6d9e811f26d175144bc99af963e0381e797ee94/adalib/
+-static
+/root/.local/share/alire/builds/bare_runtime_14.0.0_095db6f0/282b01b920f0d5bb2bac604ac6d9e811f26d175144bc99af963e0381e797ee94/adalib/libgnat.a
