@@ -27,7 +27,7 @@ set_property PACKAGE_PIN M18 [get_ports {gpio_i[0]}]
 set_property PACKAGE_PIN L17 [get_ports {gpio_i[1]}]
 
 #CAMERA DATA PINS
- #D2
+#D2
 set_property PACKAGE_PIN A15 [get_ports {gpio_i[2]}]
  #D3
 set_property PACKAGE_PIN B16 [get_ports {gpio_i[3]}]
@@ -46,6 +46,10 @@ set_property PACKAGE_PIN A16 [get_ports {gpio_i[9]}]
 
 #CAMERA PIXEL CLOCK
 set_property PACKAGE_PIN P18 [get_ports {gpio_i[10]}]
+
+#CAMERA RESET PIN
+set_property PACKAGE_PIN R18 [get_ports {gpio_i[11]}]
+
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_i[*]}]
 
@@ -53,6 +57,7 @@ set_property IOSTANDARD LVCMOS33 [get_ports {gpio_i[*]}]
 set_property PACKAGE_PIN K17 [get_ports pwm_o[0]]
 
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
+
 
 ## ======================== TWI ========================
 

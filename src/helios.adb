@@ -3,6 +3,7 @@ with Gnat_Exit;
 with Uart0;
 
 with PWM_API;  use PWM_API;
+with GPIO_API;  use GPIO_API;
 
 with neorv32;use neorv32;
 with neorv32.TWI;
@@ -13,7 +14,7 @@ procedure Helios is
    -- Camera clock using your PWM API
    ----------------------------------------------------------------------------
    Cam_External_Clock : PWM_T := Create (Channel => 0);
-
+    RESET_PIN : GPIO_Pin_T := Create_Pin (11);
    ----------------------------------------------------------------------------
    -- TWI peripheral (rename only, no alias)
    ----------------------------------------------------------------------------
@@ -45,6 +46,7 @@ procedure Helios is
 
 begin
    Ada.Text_IO.Put_Line ("Initializing Camera Clock...");
+    RESET_PIN.Set;
 
    Cam_External_Clock.Set_Hz (25_000_000.0);
    Cam_External_Clock.Set_Duty_Cycle (0.5);
@@ -61,67 +63,64 @@ begin
    --   fSCL = fmain / (4 * prescaler * (1 + CDIV))
    ----------------------------------------------------------------------------
    TWI.CTRL.TWI_CTRL_EN     := 0;
-   TWI.CTRL.TWI_CTRL_PRSC   := 4;   -- 0b100 -> prescaler = 128
-   TWI.CTRL.TWI_CTRL_CDIV   := 15;  -- fine divider
-   TWI.CTRL.TWI_CTRL_CLKSTR := 0;   -- clock stretching disabled (enable if needed)
+   TWI.CTRL.TWI_CTRL_PRSC   := 3;
+   TWI.CTRL.TWI_CTRL_CDIV   := 3;  -- fine divider
+   TWI.CTRL.TWI_CTRL_CLKSTR := 1;   -- clock stretching disabled (enable if needed)
 
    -- Enable TWI after configuration
    TWI.CTRL.TWI_CTRL_EN     := 1;
 
 
    ----------------------------------------------------------------------------
-   -- Send START (single 32-bit DCMD write)
+   -- Probe OV5640 until it ACKs
    ----------------------------------------------------------------------------
    declare
       Cmd : neorv32.TWI.DCMD_Register;
+      Reg : neorv32.TWI.DCMD_Register;
    begin
-      Cmd.TWI_DCMD_CMD := CMD_START;
-      TWI.DCMD := Cmd;
-   end;
+      loop
+         Ada.Text_IO.Put_Line ("Probing OV5640...");
 
-   TWI_Wait_Ready;
+         ---------------------------------------------------------------------
+         -- START
+         ---------------------------------------------------------------------
+         Cmd.TWI_DCMD_CMD := CMD_START;
+         TWI.DCMD := Cmd;
+         TWI_Wait_Ready;
 
-   ----------------------------------------------------------------------------
-   -- Transmit OV5640 I2C address (write)
-   -- DCMD is written ONCE as a full record to avoid unintended reads/partial writes.
-   ----------------------------------------------------------------------------
-   declare
-      Cmd : neorv32.TWI.DCMD_Register;
-   begin
-      Cmd.TWI_DCMD     := neorv32.Byte (OV5640_Addr_WR);  -- address byte
-      Cmd.TWI_DCMD_ACK := 0;                              -- let slave send ACK/NACK
-      Cmd.TWI_DCMD_CMD := CMD_TRX;                        -- data transmission command
-      TWI.DCMD := Cmd;                                    -- single 32-bit write
-   end;
+         ---------------------------------------------------------------------
+         -- Transmit OV5640 I2C address (write)
+         ---------------------------------------------------------------------
+         Cmd.TWI_DCMD     := neorv32.Byte (OV5640_Addr_WR); -- address byte
+         Cmd.TWI_DCMD_ACK := 0;                             -- let slave ACK/NACK
+         Cmd.TWI_DCMD_CMD := CMD_TRX;                       -- transmit command
+         TWI.DCMD := Cmd;
+         TWI_Wait_Ready;
 
-   TWI_Wait_Ready;
+         ---------------------------------------------------------------------
+         -- Check ACK
+         ---------------------------------------------------------------------
+         Reg := TWI.DCMD;  -- full 32-bit read
+         if Reg.TWI_DCMD_ACK = 0 then
+            Ada.Text_IO.Put_Line ("OV5640 ACK received! Communication OK.");
+            exit;  -- got it, leave the loop
+         else
+            Ada.Text_IO.Put_Line ("NO ACK from OV5640, retrying...");
 
-   ----------------------------------------------------------------------------
-   -- TRUE HARDWARE ACK/NACK CHECK
-   -- Must read the entire DCMD register (32-bit) due to Volatile_Full_Access
-   -- and the "*** modified following a read operation ***" semantics.
-   ----------------------------------------------------------------------------
-   declare
-      Reg : neorv32.TWI.DCMD_Register := TWI.DCMD;  -- real hardware read
-   begin
-      if Reg.TWI_DCMD_ACK = 0 then
-         Ada.Text_IO.Put_Line ("OV5640 ACK received! Communication OK.");
-      else
-         Ada.Text_IO.Put_Line ("NO ACK from OV5640 (device not found).");
-      end if;
-   end;
+            -- STOP before retrying
+            Cmd.TWI_DCMD_CMD := CMD_STOP;
+            TWI.DCMD := Cmd;
+            TWI_Wait_Ready;
+         end if;
+      end loop;
 
-   ----------------------------------------------------------------------------
-   -- STOP (again: build a local DCMD and write it once)
-   ----------------------------------------------------------------------------
-   declare
-      Cmd : neorv32.TWI.DCMD_Register;
-   begin
+      -------------------------------------------------------------------------
+      -- Final STOP after successful probe (optional but clean)
+      -------------------------------------------------------------------------
       Cmd.TWI_DCMD_CMD := CMD_STOP;
       TWI.DCMD := Cmd;
+      TWI_Wait_Ready;
    end;
-
-   TWI_Wait_Ready;
 
    Ada.Text_IO.Put_Line ("TWI test complete.");
 
