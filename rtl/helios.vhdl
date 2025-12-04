@@ -65,7 +65,7 @@ begin
 
       -- Instruction/Data memories
       IMEM_EN   => true,
-      IMEM_SIZE => 32*1024, -- or 64*1024, etc.
+      IMEM_SIZE => 64*1024, -- or 64*1024, etc.
       DMEM_EN   => true,
       DMEM_SIZE => 8*1024,
 
