@@ -36,8 +36,6 @@ architecture rtl of helios is
     signal twi_sda_core_o : STD_ULOGIC;
     signal twi_scl_core_i : STD_ULOGIC;
     signal twi_scl_core_o : STD_ULOGIC;
-    signal sda_pin : std_logic;
-    signal scl_pin : std_logic;
 begin
 
   ---------------------------------------------------------------------------
