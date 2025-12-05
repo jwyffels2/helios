@@ -82,13 +82,13 @@ if {[file isdirectory [file join $neorv32_rtl_dir system_integration]]} {
 
 # --------------------------------------------------------------------
 # helios VGA timing core
-#   File: C:\helios\rtl\helios_vga.vhdl
+#   File: C:\helios\rtl\helios_vga_timer.vhdl
 # --------------------------------------------------------------------
-set helios_vga_vhdl [file join $script_dir helios_vga.vhdl]
-if {![file exists $helios_vga_vhdl]} {
-    error "helios_vga VHDL file not found: $helios_vga_vhdl"
+set helios_vga_timer_vhdl [file join $script_dir helios_vga_timer.vhdl]
+if {![file exists $helios_vga_timer_vhdl]} {
+    error "helios_vga_timer VHDL file not found: $helios_vga_timer_vhdl"
 }
-add_files $helios_vga_vhdl
+add_files $helios_vga_timer_vhdl
 
 # --------------------------------------------------------------------
 # helios VGA xbus wrapper
@@ -99,6 +99,27 @@ if {![file exists $helios_vga_xbus_vhdl]} {
     error "helios_vga_xbus VHDL file not found: $helios_vga_xbus_vhdl"
 }
 add_files $helios_vga_xbus_vhdl
+
+# --------------------------------------------------------------------
+# helios Framebuffer
+#   File: C:\helios\rtl\helios_framebuffer.vhdl
+# --------------------------------------------------------------------
+set helios_framebuffer [file join $script_dir helios_framebuffer.vhdl]
+if {![file exists $helios_framebuffer]} {
+    error "helios_framebuffer VHDL file not found: $helios_framebuffer"
+}
+add_files $helios_framebuffer
+
+# --------------------------------------------------------------------
+# helios Framebuffer
+#   File: C:\helios\rtl\helios_vga.vhdl
+# --------------------------------------------------------------------
+set helios_vga [file join $script_dir helios_vga.vhdl]
+if {![file exists $helios_vga]} {
+    error "helios_vga VHDL file not found: $helios_vga"
+}
+add_files $helios_vga
+
 
 
 # --------------------------------------------------------------------
@@ -150,7 +171,7 @@ if {[llength $fileset_sim] > 0} {
 # --------------------------------------------------------------------
 # Run synthesis, implementation, and bitstream
 # --------------------------------------------------------------------
-launch_runs impl_1 -to_step write_bitstream -jobs 4
+launch_runs impl_1 -to_step write_bitstream -jobs 8
 wait_on_run impl_1
 
 # Optionally clear board repo paths again

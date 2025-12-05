@@ -1,245 +1,239 @@
---------------------
---
--- helios-vga.vhdl
---
---------------------
---  Overview
---
--- VGA sync driver
---
---
--- Creates the necessary v-sync and h-sync signals to drive a VGA display
--- Creates pixel X and Y coordinates to indicate the current raster location
--- Creates a "display on" signal to indicate data is being displayed  (optional usage)
--- Provides a buffer path for the RGB signal to ensure syncronization (optional usage)
--- 	NOTE: If using the RGB buffering, the RGB output is already blanked
---				by the display on signal
---------------------------
---- Details
---
--- Default is:
---					25MHz clock
---					640 x 480 display
---
--- Override default by using generics
---
--- Uses whatever the standard requires for a pixel clock
---     eg. default operation requires a 25MHz input (pixel) clock
---				which can be created via PLL of the DE10 Lite base 50MHz clk
---
---  Note that different display resolutions require:
---		Different pixel parameters
---		Different pixel clock frequencies
---		Different sync pulse polarities
---
---  This code is developed based on timing:
---     back porch -> display -> front porch -> sync pulse
---
---------------------------
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
-use ieee.math_real.all;
 
 entity helios_vga is
-   generic(
-		-- Default VGA 640-by-480 display parameters
-		H_back_porch: 	natural:=48;
-		H_display: 		natural:=640;
-		H_front_porch: natural:=16;
-		H_retrace: 		natural:=96;
-		V_back_porch: 	natural:=33;
-		V_display: 		natural:=480;
-		V_front_porch: natural:=10;
-		V_retrace: 		natural:=2;
-		Color_bits:		natural:=4;
-		H_sync_polarity: std_logic:= '0';	--  depends on standard (negative -> 0), (positive -> 1)
-		V_sync_polarity: std_logic:= '0';	--  depends on standard (negative -> 0), (positive -> 1)
-		-- calculated based on other generic parameters
-		H_counter_size: natural:= 10;		--  depends on above generic values
-		V_counter_size: natural:= 10		--  depends on above generic values
-	);
+  port (
+    -- System clock / reset
+    clk_i    : in  std_ulogic;
+    rstn_i   : in  std_ulogic;  -- active-low
 
-	port(
-      -- clock and reset - vid_clk is the appropriate video clock
-		-- vid_clk would be 25MHz for a 640 x 480 display
-		i_vid_clk: 		in 	std_logic;
-		i_rstb: 			in 	std_logic;
-		-- standard video sync signals
-		o_h_sync:		out 	std_logic;
-		o_v_sync:		out 	std_logic;
- 		--  X and Y values for current pixel location being written to the screen
-		--  Can be used for reference in upper levels of design
-		o_pixel_x: 		out 	std_logic_vector (H_counter_size -1 downto 0);
-		o_pixel_y: 		out 	std_logic_vector (V_counter_size - 1 downto 0);
-		-- signal to indicate display is actively being written
-		-- use this to set RGB values to 0 when not on an active part of the screen
-		-- ** not used if using the RGB in/out synchronous signals
-		o_vid_display:	out 	std_logic;
-		-- convenience signals
-		-- syncronize rgb outputs to vid_clk
-		i_red_in:     	in 	std_logic_vector((Color_bits - 1) downto 0);
-		i_green_in:		in		std_logic_vector((Color_bits - 1) downto 0);
-		i_blue_in:		in		std_logic_vector((Color_bits - 1) downto 0);
-		o_red_out:		out 	std_logic_vector((Color_bits - 1) downto 0);
-		o_green_out:	out	std_logic_vector((Color_bits - 1) downto 0);
-		o_blue_out:		out	std_logic_vector((Color_bits - 1) downto 0)
+    -- Pixel clock (25 MHz) from top level
+    vga_clk_i : in std_logic;
+
+    -- XBUS (NEORV32 external bus) slave side
+    xbus_adr_i : in  std_ulogic_vector(31 downto 0);
+    xbus_dat_i : in  std_ulogic_vector(31 downto 0);
+    xbus_dat_o : out std_ulogic_vector(31 downto 0);
+    xbus_we_i  : in  std_ulogic;
+    xbus_sel_i : in  std_ulogic_vector(3 downto 0);
+    xbus_stb_i : in  std_ulogic;
+    xbus_cyc_i : in  std_ulogic;
+    xbus_ack_o : out std_ulogic;
+    xbus_err_o : out std_ulogic;
+    xbus_cti_i : in  std_ulogic_vector(2 downto 0);
+    xbus_tag_i : in  std_ulogic_vector(2 downto 0);
+
+    -- VGA pins
+    vga_hs  : out std_logic;
+    vga_vs  : out std_logic;
+    vga_r   : out std_logic_vector(3 downto 0);
+    vga_g   : out std_logic_vector(3 downto 0);
+    vga_b   : out std_logic_vector(3 downto 0)
   );
-end;
+end entity helios_vga;
 
-architecture behavioral of helios_vga is
-	--
-   -- Counter signals
-	--
-	signal h_count:			unsigned(H_counter_size - 1 downto 0);
-	signal h_count_next: 	unsigned(H_counter_size - 1 downto 0);
-	signal v_count:			unsigned(V_counter_size - 1 downto 0);
-	signal v_count_next: 	unsigned(V_counter_size - 1 downto 0);
-   --
-	-- Display signals
-	--
-	signal v_display_on:		std_logic;
-	signal h_display_on:		std_logic;
-	signal display_on:		std_logic;
-	--
-	-- Convenience signals (RGB buffering)
-	--
-	signal red: 	unsigned((Color_bits - 1) downto 0);
-	signal green: 	unsigned((Color_bits - 1) downto 0);
-	signal blue: 	unsigned((Color_bits - 1) downto 0);
+architecture rtl of helios_vga is
+
+  ---------------------------------------------------------------------------
+  -- Parameters for framebuffer (320x240 @ 8bpp, upscaled 2x2 to 640x480)
+  ---------------------------------------------------------------------------
+  constant FB_WIDTH      : natural := 320;
+  constant FB_HEIGHT     : natural := 240;
+  constant FB_BPP        : natural := 8;
+  constant FB_ADDR_WIDTH : natural := 17; -- 2^17 = 131072 > 320*240=76800
+
+  -- XBUS register outputs
+  signal reg_ctrl    : std_ulogic_vector(31 downto 0);
+  signal reg_bgcolor : std_ulogic_vector(31 downto 0);
+
+  -- Framebuffer CPU-side wires
+  signal fb_cpu_we   : std_ulogic;
+  signal fb_cpu_addr : unsigned(FB_ADDR_WIDTH-1 downto 0);
+  signal fb_cpu_din  : std_ulogic_vector(FB_BPP-1 downto 0);
+  signal fb_cpu_dout : std_ulogic_vector(FB_BPP-1 downto 0);
+
+  -- Framebuffer VGA-side wires
+  signal fb_vga_addr : unsigned(FB_ADDR_WIDTH-1 downto 0);
+  signal fb_vga_dout : std_logic_vector(FB_BPP-1 downto 0);
+
+  -- VGA timer outputs
+  signal pix_x      : std_logic_vector(9 downto 0);
+  signal pix_y      : std_logic_vector(9 downto 0);
+  signal vid_on     : std_logic;
+  signal vga_r_int  : std_logic_vector(3 downto 0);
+  signal vga_g_int  : std_logic_vector(3 downto 0);
+  signal vga_b_int  : std_logic_vector(3 downto 0);
+
+  -- internal upscaled coords
+  signal fb_x       : unsigned(8 downto 0);
+  signal fb_y       : unsigned(8 downto 0);
 
 begin
-	--
-	--	 counter logic
-	--
-	process (h_count, v_count)
-	begin
-		--
-		--		Horizontal counter
-		--
-		if (h_count >= (H_back_porch + H_display + H_front_porch + H_retrace - 1)) then
-			h_count_next <= (others => '0');
-		else
-			h_count_next <= h_count + 1;
-		end if;
-		--
-		--		Horizontal Sync
-		--
-		if ((h_count >= (H_back_porch + H_display + H_front_porch)) and
-							(h_count <= (H_back_porch + H_display + H_front_porch + H_retrace))) then
-			o_h_sync <= H_sync_polarity;
-		else
-			o_h_sync <= not(H_sync_polarity);
-		end if;
-		--
-		--		Horizontal display on
-		--
-		if ((h_count >= (H_back_porch)) and (h_count <= (H_back_porch + H_display - 1))) then
-			h_display_on <= '1';
-		else
-			h_display_on <= '0';
-		end if;
-		--
-		--		Vertical counter
-		--
-		--		Must also wait for the end of the horizontal counter
-		--		to get all the way to the lower right
-		--
-		if ((v_count >= (V_back_porch + V_display + V_front_porch + V_retrace - 1)) and
-							(h_count >= (H_back_porch + H_display + H_front_porch + H_retrace -1))) then
-			v_count_next <= (others => '0');
-		elsif (h_count >= (H_back_porch + H_display + H_front_porch + H_retrace -1)) then
-			v_count_next <= v_count + 1;
-		else
-			v_count_next <= v_count;
-		end if;
-		--
-		--		Vertical Sync
-		--
-		if ((v_count >= (V_back_porch + V_display + V_front_porch)) and
-							(v_count <= (V_back_porch + V_display + V_front_porch + V_retrace))) then
-			o_v_sync <= V_sync_polarity;
-		else
-			o_v_sync <= not(V_sync_polarity);
-		end if;
-		--
-		--		Vertical display on
-		--
-		if ((v_count >= (V_back_porch)) and (v_count <= (V_back_porch + V_display - 1))) then
-			v_display_on <= '1';
-		else
-			v_display_on <= '0';
-		end if;
-	end process;
-	--
-	--		Combined display on
-	--
-	display_on <= h_display_on AND v_display_on;
 
+  ---------------------------------------------------------------------------
+  -- XBUS block (no VGA dependence)
+  ---------------------------------------------------------------------------
+  u_xbus : entity work.helios_vga_xbus
+    generic map (
+      FB_ADDR_WIDTH   => FB_ADDR_WIDTH,
+      FB_BPP          => FB_BPP,
+      VRAM_REGION_SEL => "0001"  -- xbus_adr_i(15..12) = 1xxx -> VRAM
+    )
+    port map (
+      clk_i        => clk_i,
+      rstn_i       => rstn_i,
 
-	----------------
-	--  Synchronous update section
-	----------------
-	process (i_vid_clk, i_rstb)
-   begin
-      if i_rstb='0' then
-         v_count 	<= (others=>'0');
-         h_count 	<= (others=>'0');
-			red 		<= (others=>'0');
-			green 	<= (others=>'0');
-			blue 		<= (others=>'0');
-      elsif (rising_edge(i_vid_clk)) then
-         v_count <= v_count_next;
-         h_count <= h_count_next;
-			--RGB syncronizer
-			red 	<= unsigned(i_red_in);
-			green <= unsigned(i_green_in);
-			blue 	<= unsigned(i_blue_in);
+      xbus_adr_i   => xbus_adr_i,
+      xbus_dat_i   => xbus_dat_i,
+      xbus_dat_o   => xbus_dat_o,
+      xbus_we_i    => xbus_we_i,
+      xbus_sel_i   => xbus_sel_i,
+      xbus_stb_i   => xbus_stb_i,
+      xbus_cyc_i   => xbus_cyc_i,
+      xbus_ack_o   => xbus_ack_o,
+      xbus_err_o   => xbus_err_o,
+      xbus_cti_i   => xbus_cti_i,
+      xbus_tag_i   => xbus_tag_i,
+
+      ctrl_o       => reg_ctrl,
+      bgcolor_o    => reg_bgcolor,
+
+      fb_we_o      => fb_cpu_we,
+      fb_addr_o    => fb_cpu_addr,
+      fb_din_o     => fb_cpu_din,
+      fb_dout_i    => fb_cpu_dout
+    );
+
+  ---------------------------------------------------------------------------
+  -- Framebuffer RAM
+  ---------------------------------------------------------------------------
+  u_fb : entity work.helios_framebuffer
+    generic map (
+      FB_WIDTH   => FB_WIDTH,
+      FB_HEIGHT  => FB_HEIGHT,
+      BPP        => FB_BPP,
+      ADDR_WIDTH => FB_ADDR_WIDTH
+    )
+    port map (
+      clk_cpu   => clk_i,
+      we_cpu    => fb_cpu_we,
+      addr_cpu  => fb_cpu_addr,
+      din_cpu   => fb_cpu_din,
+      dout_cpu  => fb_cpu_dout,
+
+      clk_vga   => vga_clk_i,
+      addr_vga  => fb_vga_addr,
+      dout_vga  => fb_vga_dout
+    );
+
+  ---------------------------------------------------------------------------
+  -- VGA timing core (your renamed helios_vga_timer)
+  ---------------------------------------------------------------------------
+  u_vga_timer : entity work.helios_vga_timer
+    generic map (
+      H_back_porch     => 48,
+      H_display        => 640,
+      H_front_porch    => 16,
+      H_retrace        => 96,
+      V_back_porch     => 33,
+      V_display        => 480,
+      V_front_porch    => 10,
+      V_retrace        => 2,
+      Color_bits       => 4,
+      H_sync_polarity  => '0',
+      V_sync_polarity  => '0',
+      H_counter_size   => 10,
+      V_counter_size   => 10
+    )
+    port map (
+      i_vid_clk     => vga_clk_i,
+      i_rstb        => rstn_i, -- active-low
+
+      o_h_sync      => vga_hs,
+      o_v_sync      => vga_vs,
+
+      o_pixel_x     => pix_x,
+      o_pixel_y     => pix_y,
+      o_vid_display => vid_on,
+
+      i_red_in      => vga_r_int,
+      i_green_in    => vga_g_int,
+      i_blue_in     => vga_b_int,
+
+      o_red_out     => vga_r,
+      o_green_out   => vga_g,
+      o_blue_out    => vga_b
+    );
+
+  ---------------------------------------------------------------------------
+  -- VGA side: compute framebuffer address from pixel coords (2x2 upscale)
+  ---------------------------------------------------------------------------
+  process(vga_clk_i, rstn_i)
+    variable ux       : unsigned(8 downto 0);
+    variable uy       : unsigned(8 downto 0);
+    variable ix, iy   : integer;
+    variable addr_int : integer;
+  begin
+    if rstn_i = '0' then
+      fb_vga_addr <= (others => '0');
+      fb_x        <= (others => '0');
+      fb_y        <= (others => '0');
+
+    elsif rising_edge(vga_clk_i) then
+      if vid_on = '1' then
+        -- Divide by 2: 640x480 -> 320x240
+        ux := unsigned(pix_x(9 downto 1)); -- 0..319
+        uy := unsigned(pix_y(9 downto 1)); -- 0..239
+        fb_x <= ux;
+        fb_y <= uy;
+
+        -- Integer math for address = y*FB_WIDTH + x
+        iy       := to_integer(uy);
+        ix       := to_integer(ux);
+        addr_int := iy * FB_WIDTH + ix;
+
+        fb_vga_addr <= to_unsigned(addr_int, FB_ADDR_WIDTH);
+      else
+        fb_vga_addr <= (others => '0');
       end if;
-   end process;
-
-	-----------------
-	--  Output section
-	-----------------
-	--
-	-- alternate signal to control RGB values externally
-	-- not used if the RGB syncronizer is used
-	--
-	o_vid_display <= display_on;
-	--
-	--	pixel values range from 0 to ((display size) -1)
-	-- if display is off, pixel values are set to (display size)
-	-- eg x might range from 0 to 799 with x = 800 when the display is off
-	--
-	process(all)
-	begin
-		if(h_display_on = '1') then
-			o_pixel_x <= std_logic_vector(h_count - H_back_porch);
-		else
-			o_pixel_x <= std_logic_vector(to_unsigned(H_display, H_counter_size));
-		end if;
-		if(v_display_on = '1') then
-			o_pixel_y <= std_logic_vector(v_count - V_back_porch);
-		else
-			o_pixel_y <= std_logic_vector(to_unsigned(V_display, V_counter_size));
-		end if;
-	end process;
-	--
-	-- RGB helper to turn off RGB when display is not in the active area of the screen
-	--
-	process(all)
-	begin
-		if(display_on = '1') then
-			o_red_out <= std_logic_vector(red);
-			o_green_out <= std_logic_vector(green);
-			o_blue_out <= std_logic_vector(blue);
-		else
-			o_red_out <= (others => '0');
-			o_green_out <= (others => '0');
-			o_blue_out <= (others => '0');
-		end if;
-	end process;
+    end if;
+  end process;
 
 
-end architecture;
+  ---------------------------------------------------------------------------
+  -- Color selection:
+  --   reg_ctrl(0) = 0 -> video disabled (black)
+  --   reg_ctrl(0) = 1, reg_ctrl(1) = 0 -> solid BGCOLOR
+  --   reg_ctrl(0) = 1, reg_ctrl(1) = 1 -> framebuffer grayscale
+  ---------------------------------------------------------------------------
+  process(vid_on, reg_ctrl, reg_bgcolor, fb_vga_dout)
+    variable r_nib : std_logic_vector(3 downto 0);
+    variable g_nib : std_logic_vector(3 downto 0);
+    variable b_nib : std_logic_vector(3 downto 0);
+    variable gray  : std_logic_vector(3 downto 0);
+  begin
+    r_nib := reg_bgcolor(3  downto 0);
+    g_nib := reg_bgcolor(7  downto 4);
+    b_nib := reg_bgcolor(11 downto 8);
+
+    if (vid_on = '1') and (reg_ctrl(0) = '1') then      -- video enabled
+      if reg_ctrl(1) = '1' then -- FRAMEBUFFER MODE
+        gray      := fb_vga_dout(7 downto 4);
+        vga_r_int <= gray;
+        vga_g_int <= gray;
+        vga_b_int <= gray;
+      else -- BACKGROUND MODE
+        vga_r_int <= r_nib;
+        vga_g_int <= g_nib;
+        vga_b_int <= b_nib;
+      end if;
+    else  -- disabled / blank
+      vga_r_int <= (others => '0');
+      vga_g_int <= (others => '0');
+      vga_b_int <= (others => '0');
+    end if;
+  end process;
+
+
+end architecture rtl;

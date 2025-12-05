@@ -59,24 +59,21 @@ architecture rtl of helios is
   ---------------------------------------------------------------------------
   -- External bus (xbus) signals: NEORV32 master -> VGA xbus slave
   ---------------------------------------------------------------------------
-  signal xbus_adr    : std_ulogic_vector(31 downto 0);
-  signal xbus_dat_m2s: std_ulogic_vector(31 downto 0); -- master -> slave
-  signal xbus_dat_s2m: std_ulogic_vector(31 downto 0); -- slave -> master
-  signal xbus_cti    : std_ulogic_vector(2 downto 0);
-  signal xbus_tag    : std_ulogic_vector(2 downto 0);
-  signal xbus_we     : std_ulogic;
-  signal xbus_sel    : std_ulogic_vector(3 downto 0);
-  signal xbus_stb    : std_ulogic;
-  signal xbus_cyc    : std_ulogic;
-  signal xbus_ack    : std_ulogic;
-  signal xbus_err    : std_ulogic;
+  signal xbus_adr     : std_ulogic_vector(31 downto 0);
+  signal xbus_dat_m2s : std_ulogic_vector(31 downto 0); -- master -> slave
+  signal xbus_dat_s2m : std_ulogic_vector(31 downto 0); -- slave -> master
+  signal xbus_cti     : std_ulogic_vector(2 downto 0);
+  signal xbus_tag     : std_ulogic_vector(2 downto 0);
+  signal xbus_we      : std_ulogic;
+  signal xbus_sel     : std_ulogic_vector(3 downto 0);
+  signal xbus_stb     : std_ulogic;
+  signal xbus_cyc     : std_ulogic;
+  signal xbus_ack     : std_ulogic;
+  signal xbus_err     : std_ulogic;
 
-  ---------------------------------------------------------------------------
-  -- VGA pixel clock divider: 100 MHz -> 25 MHz
-  ---------------------------------------------------------------------------
-  signal vga_clk     : std_logic;
+  -- VGA pixel clock (driven from PWM channel 0)
+  signal vga_clk      : std_logic;
   signal vga_div_cnt : unsigned(1 downto 0) := (others => '0');
-
 begin
 
   ---------------------------------------------------------------------------
@@ -140,7 +137,7 @@ begin
       jtag_tdo_o   => open,
       jtag_tms_i   => '0',
 
-      -- External bus (xbus) - now CONNECTED to VGA
+      -- External bus (xbus)
       xbus_adr_o   => xbus_adr,
       xbus_dat_o   => xbus_dat_m2s,
       xbus_cti_o   => xbus_cti,
@@ -229,7 +226,11 @@ begin
     );
 
   ---------------------------------------------------------------------------
-  -- VGA pixel clock: 100 MHz / 4 = 25 MHz
+  -- VGA pixel clock: driven by PWM channel 0
+  ---------------------------------------------------------------------------
+--   vga_clk <= std_logic(pwm_core_o(0));
+  ---------------------------------------------------------------------------
+  -- VGA pixel clock: 100 MHz / 4 = 25 MHz (simple divider for now)
   ---------------------------------------------------------------------------
   process(clk_i, rstn_core)
   begin
@@ -238,57 +239,56 @@ begin
       vga_clk     <= '0';
     elsif rising_edge(clk_i) then
       vga_div_cnt <= vga_div_cnt + 1;
-      vga_clk     <= std_logic(vga_div_cnt(1));
+      vga_clk     <= std_logic(vga_div_cnt(1));  -- bit1 => divide by 4
     end if;
   end process;
-
   ---------------------------------------------------------------------------
-  -- Instantiate VGA xbus peripheral (wraps helios_vga)
+  -- Instantiate VGA peripheral (helios_vga = xbus + framebuffer + timer)
   ---------------------------------------------------------------------------
-  u_vga_xbus : entity work.helios_vga_xbus
+  u_vga : entity work.helios_vga
     port map (
-      clk_i      => clk_i,
-      rstn_i     => rstn_core,
+      clk_i       => clk_i,
+      rstn_i      => rstn_core,
 
-      vga_clk_i  => vga_clk,
+      vga_clk_i   => vga_clk,
 
-      xbus_adr_i => xbus_adr,
-      xbus_dat_i => xbus_dat_m2s,
-      xbus_dat_o => xbus_dat_s2m,
-      xbus_we_i  => xbus_we,
-      xbus_sel_i => xbus_sel,
-      xbus_stb_i => xbus_stb,
-      xbus_cyc_i => xbus_cyc,
-      xbus_ack_o => xbus_ack,
-      xbus_err_o => xbus_err,
-      xbus_cti_i => xbus_cti,
-      xbus_tag_i => xbus_tag,
+      xbus_adr_i  => xbus_adr,
+      xbus_dat_i  => xbus_dat_m2s,
+      xbus_dat_o  => xbus_dat_s2m,
+      xbus_we_i   => xbus_we,
+      xbus_sel_i  => xbus_sel,
+      xbus_stb_i  => xbus_stb,
+      xbus_cyc_i  => xbus_cyc,
+      xbus_ack_o  => xbus_ack,
+      xbus_err_o  => xbus_err,
+      xbus_cti_i  => xbus_cti,
+      xbus_tag_i  => xbus_tag,
 
-      vga_hs     => vga_hs,
-      vga_vs     => vga_vs,
-      vga_r      => vga_r,
-      vga_g      => vga_g,
-      vga_b      => vga_b
+      vga_hs      => vga_hs,
+      vga_vs      => vga_vs,
+      vga_r       => vga_r,
+      vga_g       => vga_g,
+      vga_b       => vga_b
     );
 
   ---------------------------------------------------------------------------
   -- GPIO, PWM, TWI wiring to top-level ports
   ---------------------------------------------------------------------------
-    -- No external GPIO inputs: feed zeros into NEORV32
-    gpio_core_i <= (others => '0');
+  -- No external GPIO inputs: feed zeros into NEORV32
+  gpio_core_i <= (others => '0');
 
-    -- Only expose lower 12 GPIO outputs to pins
-    gpio_o <= gpio_core_o(11 downto 0);
+  -- Only expose lower 12 GPIO outputs to pins
+  gpio_o <= gpio_core_o(11 downto 0);
 
-    -- Only expose PWM channel 0
-    pwm_o <= pwm_core_o(0);
+  -- Only expose PWM channel 0
+  pwm_o <= pwm_core_o(0);
 
   -- SDA Open-Drain Wiring
-  twi_sda           <= '0' when (twi_sda_core_o = '0') else 'Z';
-  twi_sda_core_i    <= twi_sda;
+  twi_sda        <= '0' when (twi_sda_core_o = '0') else 'Z';
+  twi_sda_core_i <= twi_sda;
 
   -- SCL Open-Drain Wiring
-  twi_scl           <= '0' when (twi_scl_core_o = '0') else 'Z';
-  twi_scl_core_i    <= twi_scl;
+  twi_scl        <= '0' when (twi_scl_core_o = '0') else 'Z';
+  twi_scl_core_i <= twi_scl;
 
 end architecture rtl;
