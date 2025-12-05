@@ -192,13 +192,13 @@ begin
 -- SDA Open-Drain Wiring
 ------------------------------------------------------------------
 twi_sda <= '0' when (twi_sda_core_o = '0') else 'Z';
-twi_sda_core_i <= twi_sda;
+twi_sda_core_i <= std_ulogic(twi_sda);
 
 ------------------------------------------------------------------
 -- SCL Open-Drain Wiring
 ------------------------------------------------------------------
 twi_scl <= '0' when (twi_scl_core_o = '0') else 'Z';
-twi_scl_core_i <= twi_scl;
+twi_scl_core_i <= std_ulogic(twi_scl);
 
 
 end architecture rtl;
