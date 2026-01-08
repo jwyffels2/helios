@@ -111,6 +111,30 @@ set wrapper_vhdl [file join $script_dir helios.vhdl]
 if {![file exists $wrapper_vhdl]} {
     error "Wrapper VHDL file not found: $wrapper_vhdl"
 }
+# --------------------------------------------------------------------
+# Local RTL sources needed by helios.vhdl
+# --------------------------------------------------------------------
+set local_rtl {}
+
+# Stub referenced by helios.vhdl
+set vga_stub [file join $script_dir vga_fb_integration_stub.vhd]
+if {[file exists $vga_stub]} {
+    lappend local_rtl $vga_stub
+} else {
+    error "Missing file: $vga_stub"
+}
+
+# VGA framebuffer package + memory etc (if helios uses them)
+set vga_dir [file join $script_dir vga_fb]
+if {[file isdirectory $vga_dir]} {
+    set vga_files [glob -nocomplain [file join $vga_dir *.vhd]]
+    foreach f $vga_files { lappend local_rtl $f }
+}
+
+if {[llength $local_rtl] > 0} {
+    add_files $local_rtl
+}
+
 add_files $wrapper_vhdl
 
 # Set wrapper as design top
@@ -152,6 +176,8 @@ if {[llength $fileset_sim] > 0} {
 # --------------------------------------------------------------------
 # Run synthesis, implementation, and bitstream
 # --------------------------------------------------------------------
+launch_runs synth_1 -jobs 4
+wait_on_run synth_1
 launch_runs impl_1 -to_step write_bitstream -jobs 4
 wait_on_run impl_1
 

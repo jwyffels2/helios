@@ -1,46 +1,32 @@
-## ===============================================================
-## Basys3 Minimal Constraints for NEORV32 Bootloader Test Setup
-## ===============================================================
+## VGA Connector (Basys3)
+## NOTE: VGA uses J18 for vga_b_o[3]. Do NOT also use J18 for UART TX.
+# 100 MHz board clock
+create_clock -period 10.000 [get_ports clk_i]
+# Red[3:0]
+set_property PACKAGE_PIN G19 [get_ports {vga_r_o[0]}]
+set_property PACKAGE_PIN H19 [get_ports {vga_r_o[1]}]
+set_property PACKAGE_PIN J19 [get_ports {vga_r_o[2]}]
+set_property PACKAGE_PIN N19 [get_ports {vga_r_o[3]}]
 
-## Clock input (100 MHz)
-set_property PACKAGE_PIN W5 [get_ports clk_i]
-set_property IOSTANDARD LVCMOS33 [get_ports clk_i]
-create_clock -period 10.000 -name sys_clk_pin [get_ports clk_i]
+# Green[3:0]
+set_property PACKAGE_PIN J17 [get_ports {vga_g_o[0]}]
+set_property PACKAGE_PIN H17 [get_ports {vga_g_o[1]}]
+set_property PACKAGE_PIN G17 [get_ports {vga_g_o[2]}]
+set_property PACKAGE_PIN D17 [get_ports {vga_g_o[3]}]
 
-## Reset button (BTNC)
-set_property PACKAGE_PIN U18 [get_ports rstn_i]
-set_property IOSTANDARD LVCMOS33 [get_ports rstn_i]
+# Blue[3:0]
+set_property PACKAGE_PIN N18 [get_ports {vga_b_o[0]}]
+set_property PACKAGE_PIN L18 [get_ports {vga_b_o[1]}]
+set_property PACKAGE_PIN K18 [get_ports {vga_b_o[2]}]
+set_property PACKAGE_PIN J18 [get_ports {vga_b_o[3]}]
 
-## UART0 (USB-UART bridge on Basys3)
-# J17 = RX from FTDI to FPGA (uart0_rxd_i)
-# J18 = TX from FPGA to FTDI (uart0_txd_o)
-set_property PACKAGE_PIN B18 [get_ports uart0_rxd_i]
-set_property IOSTANDARD LVCMOS33 [get_ports uart0_rxd_i]
-set_property PACKAGE_PIN A18 [get_ports uart0_txd_o]
-set_property IOSTANDARD LVCMOS33 [get_ports uart0_txd_o]
+# Sync
+set_property PACKAGE_PIN P19 [get_ports vga_hsync_o]
+set_property PACKAGE_PIN R19 [get_ports vga_vsync_o]
 
-## Optional GPIO outputs (connect to on-board LEDs LD0–LD7)
-set_property PACKAGE_PIN U16 [get_ports {gpio_o[0]}]
-set_property PACKAGE_PIN E19 [get_ports {gpio_o[1]}]
-set_property PACKAGE_PIN U19 [get_ports {gpio_o[2]}]
-set_property PACKAGE_PIN V19 [get_ports {gpio_o[3]}]
-set_property PACKAGE_PIN W18 [get_ports {gpio_o[4]}]
-set_property PACKAGE_PIN U15 [get_ports {gpio_o[5]}]
-set_property PACKAGE_PIN U14 [get_ports {gpio_o[6]}]
-#set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
-#set_property PACKAGE_PIN B16 [get_ports {gpio_o[7]}]
-set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
-
-
-set_property PACKAGE_PIN B16 [get_ports pwm_o[0]]
-set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
-
-
-## Bitstream configuration
-set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]
-set_property BITSTREAM.CONFIG.SPI_BUSWIDTH 4 [current_design]
-set_property CONFIG_MODE SPIx4 [current_design]
-set_property BITSTREAM.CONFIG.CONFIGRATE 33 [current_design]
-set_property CONFIG_VOLTAGE 3.3 [current_design]
-set_property CFGBVS VCCO [current_design]
-set_property SEVERITY {Warning} [get_drc_checks UCIO-1]
+# I/O standards for all VGA pins
+set_property IOSTANDARD LVCMOS33 [get_ports {vga_r_o[*]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {vga_g_o[*]}]
+set_property IOSTANDARD LVCMOS33 [get_ports {vga_b_o[*]}]
+set_property IOSTANDARD LVCMOS33 [get_ports vga_hsync_o]
+set_property IOSTANDARD LVCMOS33 [get_ports vga_vsync_o]
