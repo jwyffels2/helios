@@ -72,6 +72,9 @@ if {![file exists $vga_timing]} {
 }
 lappend local_rtl $vga_timing
 
+set vram_file [file join $script_dir vram_rgb332_dp.vhd]
+lappend local_rtl $vram_file
+
 set fb_file [file join $script_dir fb_bram_rgb332_160x120.vhd]
 if {![file exists $fb_file]} { error "Missing FB file: $fb_file" }
 lappend local_rtl $fb_file
