@@ -57,28 +57,37 @@ if {![file exists $top_vhdl]} {
     error "Missing top-level file: $top_vhdl"
 }
 add_files $top_vhdl
-
+puts "=== RTL files in project ==="
+foreach f [get_files] { puts $f }
+puts "============================"
 # --------------------------------------------------------------------
 # Local RTL dependencies (VGA)
 # --------------------------------------------------------------------
 set local_rtl {}
 
-set vga_stub [file join $script_dir vga_fb_integration_stub.vhd]
-if {![file exists $vga_stub]} {
-    error "Missing VGA stub: $vga_stub"
+# VGA timing generator used by helios.vhdl
+set vga_timing [file join $script_dir vga_640x480_timing.vhd]
+if {![file exists $vga_timing]} {
+    error "Missing VGA timing file: $vga_timing"
 }
-lappend local_rtl $vga_stub
+lappend local_rtl $vga_timing
 
-set vga_dir [file join $script_dir vga_fb]
-if {[file isdirectory $vga_dir]} {
-    set vga_files [glob -nocomplain [file join $vga_dir *.vhd]]
-    foreach f $vga_files { lappend local_rtl $f }
-}
+set fb_file [file join $script_dir fb_bram_rgb332_160x120.vhd]
+if {![file exists $fb_file]} { error "Missing FB file: $fb_file" }
+lappend local_rtl $fb_file
+
+#set vga_dir [file join $script_dir vga_fb]
+#if {[file isdirectory $vga_dir]} {
+#    set vga_files [glob -nocomplain [file join $vga_dir *.vhd]]
+#    foreach f $vga_files { lappend local_rtl $f }
+#}
 
 if {[llength $local_rtl] > 0} {
     add_files $local_rtl
 }
-
+puts "=== RTL files in project (after deps) ==="
+foreach f [get_files] { puts $f }
+puts "========================================"
 # Set design top
 set_property top helios [current_fileset]
 
