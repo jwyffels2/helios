@@ -7,6 +7,7 @@ package VGA_FB is
    -- Initial format/resolution assumptions (match vga_fb_pkg.vhd)
    FB_W : constant := 160;
    FB_H : constant := 120;
+   FB_SIZE_BYTES : constant := FB_W * FB_H;
 
    -- Minimal API (stubs are fine for now, but compiles + shows intent)
    procedure Put_Pixel (X, Y : Natural; Color : Interfaces.Unsigned_8);

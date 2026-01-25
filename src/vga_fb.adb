@@ -9,8 +9,8 @@ package body VGA_FB is
    type Byte_Array is array (Natural range <>) of Unsigned_8
      with Pack;
 
-   -- Map a 64 KiB window (must match VGA_FB_SIZE in VHDL package).
-   FB_SIZE_BYTES : constant := 64 * 1024;
+   -- Map the framebuffer region; RTL decodes a larger window, but only
+   -- FB_W * FB_H bytes are used for pixels.
 
    FB : Byte_Array (0 .. FB_SIZE_BYTES - 1)
      with Import, Volatile,

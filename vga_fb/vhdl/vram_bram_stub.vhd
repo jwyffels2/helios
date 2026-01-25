@@ -1,4 +1,3 @@
-@'
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
@@ -33,4 +32,3 @@ begin
 
   rd_data_o <= (others => '0');
 end architecture;
-'@ | Set-Content -Encoding UTF8 vga_fb\vhdl\vram_bram_stub.vhd
