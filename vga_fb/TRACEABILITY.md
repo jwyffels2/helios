@@ -1,15 +1,30 @@
 # Traceability Notes (VGA Framebuffer / VRAM)
 
-This branch is **not** claiming VGA is solved end-to-end.
-Justin has demonstrated VGA output (color bars / signal path), but this work targets a different slice:
+Context:
+- The main branch keeps a NEORV32 top-level with UART/GPIO/PWM and build flow.
+- VGA signal work exists elsewhere; this branch does not replace it.
+- This branch focuses on a CPU-writable VRAM path that can drive VGA later.
 
-- A CPU-writable framebuffer (VRAM) path that can drive VGA scanout from memory contents.
-- This is also the bridge needed for future work: camera capture -> buffer -> VGA.
+In-scope for this change set:
+- VRAM storage with byte-enable writes and VGA read path (`rtl/vram_rgb332_dp.vhd`).
+- A simple Wishbone-style shim for future NEORV32 external bus integration
+  (`rtl/vram_wb_slave.vhd`).
+- A timing-only VGA generator for later use (`rtl/vga_640x480_timing.vhd`).
+- Ada stubs that express the intended software API (`src/vga_fb.*`).
+- Documentation stubs describing the intended integration points.
 
-Verification intent (future):
-- Write test pattern from Ada into VRAM, confirm expected frame output.
-- Confirm address map + byte enables (32-bit writes).
-- Confirm scanout timing and bandwidth.
+Out-of-scope / intentionally unchanged:
+- No replacement of the NEORV32 top-level or build scripts.
+- No constraint changes for VGA pins.
+- No end-to-end VGA scanout from VRAM in this branch.
+- No camera, DMA, or display pipeline changes.
 
-Status:
-- Scaffold only. Modules compile as stubs and are not integrated into the top-level yet.
+Addressing intent (documented only):
+- VRAM window base: 0xF000_0000 (see `vram_wb_slave`).
+- Size: 0x5000 bytes (19200 bytes used for 160x120 RGB332).
+- Ada stubs currently expose 160x120, 1 byte per pixel.
+
+Verification intent (future work):
+- Synthesis-only sanity check of new RTL modules.
+- Software pattern write into VRAM and verify readback/scanout once wired.
+- Confirm byte-enable behavior and address mapping.
