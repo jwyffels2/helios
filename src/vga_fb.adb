@@ -14,7 +14,14 @@ package body VGA_FB is
 
    FB : Byte_Array (0 .. FB_SIZE_BYTES - 1)
      with Import, Volatile,
-          Address => System'To_Address (Integer_Address (FB_BASE));
+          Address => FB_BASE;
+
+   -- Word view for faster clears/fills. This is safe because the framebuffer
+   -- size is a multiple of 4 for the current 160x120@RGB332 setup.
+   type Word_Array is array (Natural range <>) of Unsigned_32;
+   FB32 : Word_Array (0 .. (FB_SIZE_BYTES / 4) - 1)
+     with Import, Volatile,
+          Address => FB_BASE;
 
    function Idx (X, Y : Natural) return Natural is
    begin
@@ -31,8 +38,18 @@ package body VGA_FB is
    end Put_Pixel;
 
    procedure Fill (Color : Unsigned_8) is
+      C32     : constant Unsigned_32 := Unsigned_32 (Color);
+      Pattern : constant Unsigned_32 :=
+        C32 or Shift_Left (C32, 8) or Shift_Left (C32, 16) or Shift_Left (C32, 24);
+      Tail_Start : constant Natural := (FB_SIZE_BYTES / 4) * 4;
    begin
-      for I in FB'Range loop
+      -- Use 32-bit writes for throughput; RTL expands/strobes byte enables.
+      for I in FB32'Range loop
+         FB32 (I) := Pattern;
+      end loop;
+
+      -- Tail bytes (in case FB_SIZE_BYTES is not a multiple of 4).
+      for I in Tail_Start .. FB'Last loop
          FB (I) := Color;
       end loop;
    end Fill;

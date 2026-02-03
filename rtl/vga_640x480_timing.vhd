@@ -16,14 +16,14 @@ use ieee.numeric_std.all;
 -- What this module does NOT do:
 --   - Generate any RGB/color data
 --   - Read from or write to a framebuffer/VRAM
---   - Create a pixel clock (use a clock-enable instead)
+--   - Create a separate pixel clock (it generates an internal clock-enable)
 --
 -- Clocking model (important for clean implementation):
 --   - clk_i is the *real* FPGA clock (e.g., 100 MHz on Basys3)
---   - pix_ce_i is a 1-cycle "pixel strobe" asserted at the pixel rate
---     For 640x480@60, pixel rate is ~25 MHz, so pix_ce_i should assert
---     once every 4 cycles of a 100 MHz clk_i.
---   - Counters only advance when pix_ce_i = '1'
+--   - A 1-cycle "pixel strobe" is generated internally at (clk_i / PIX_CE_DIV)
+--     For 640x480@60, pixel rate is ~25 MHz. With a 100 MHz clk_i, use
+--     PIX_CE_DIV=4. If clk_i is already your pixel clock, use PIX_CE_DIV=1.
+--   - Counters only advance on that pixel strobe
 --
 -- Notes:
 --   - x_o/y_o always reflect the raw counters (including porches + sync)
@@ -31,10 +31,15 @@ use ieee.numeric_std.all;
 -- ============================================================================
 
 entity vga_640x480_timing is
+  generic (
+    -- Pixel strobe divider relative to clk_i.
+    --   Basys3: 100 MHz / 4 = 25 MHz pixel rate (close enough for many monitors).
+    --   If you provide a true pixel clock on clk_i (e.g., via MMCM), set this to 1.
+    PIX_CE_DIV : positive := 4
+  );
   port (
     clk_i    : in  std_ulogic;  -- system clock (e.g., 100 MHz)
-    rst_i    : in  std_ulogic;  -- ACTIVE-HIGH synchronous reset
-    pix_ce_i : in  std_ulogic;  -- 1-cycle enable at pixel rate
+    rstn_i   : in  std_ulogic;  -- ACTIVE-LOW synchronous reset (matches NEORV32 style)
 
     hsync_o  : out std_ulogic;  -- active-low horizontal sync
     vsync_o  : out std_ulogic;  -- active-low vertical sync
@@ -68,6 +73,9 @@ architecture rtl of vga_640x480_timing is
   signal h_cnt : unsigned(9 downto 0) := (others => '0'); -- 0..799
   signal v_cnt : unsigned(9 downto 0) := (others => '0'); -- 0..524
 
+  -- clk_i -> pixel-rate strobe (1-cycle) generator
+  signal pix_div_cnt : integer range 0 to PIX_CE_DIV-1 := 0;
+
   -- --------------------------------------------------------------------------
   -- Decoded outputs (combinational from counters)
   -- --------------------------------------------------------------------------
@@ -78,30 +86,41 @@ architecture rtl of vga_640x480_timing is
 begin
 
   ----------------------------------------------------------------------------
-  -- Pixel counters (advance ONLY when pix_ce_i='1')
+  -- Pixel counters (advance ONLY at the pixel strobe rate)
   -- Synchronous reset brings counters back to 0,0.
   ----------------------------------------------------------------------------
   process(clk_i)
+    variable tick : boolean;
   begin
     if rising_edge(clk_i) then
-      if rst_i = '1' then
+      if rstn_i = '0' then
+        pix_div_cnt <= 0;
         h_cnt <= (others => '0');
         v_cnt <= (others => '0');
 
-      elsif pix_ce_i = '1' then
-        -- End of line?
-        if h_cnt = to_unsigned(H_TOTAL - 1, h_cnt'length) then
-          h_cnt <= (others => '0');
-
-          -- End of frame?
-          if v_cnt = to_unsigned(V_TOTAL - 1, v_cnt'length) then
-            v_cnt <= (others => '0');
-          else
-            v_cnt <= v_cnt + 1;
-          end if;
-
+      else
+        -- Generate 1-cycle pixel-rate strobe (tick) every PIX_CE_DIV cycles.
+        tick := (pix_div_cnt = (PIX_CE_DIV - 1));
+        if tick then
+          pix_div_cnt <= 0;
         else
-          h_cnt <= h_cnt + 1;
+          pix_div_cnt <= pix_div_cnt + 1;
+        end if;
+
+        if tick then
+          -- End of line?
+          if h_cnt = to_unsigned(H_TOTAL - 1, h_cnt'length) then
+            h_cnt <= (others => '0');
+
+            -- End of frame?
+            if v_cnt = to_unsigned(V_TOTAL - 1, v_cnt'length) then
+              v_cnt <= (others => '0');
+            else
+              v_cnt <= v_cnt + 1;
+            end if;
+          else
+            h_cnt <= h_cnt + 1;
+          end if;
         end if;
       end if;
     end if;
