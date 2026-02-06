@@ -1,5 +1,13 @@
 with Ada.Text_IO;
+with Ada.Text_IO;
 with Gnat_Exit;
+with Uart0;
+
+with PWM_API;  use PWM_API;
+with GPIO_API;  use GPIO_API;
+
+with neorv32;use neorv32;
+with neorv32.TWI; use neorv32.TWI;
 with Uart0;
 
 with PWM_API;  use PWM_API;
@@ -9,6 +17,41 @@ with neorv32;use neorv32;
 with neorv32.TWI; use neorv32.TWI;
 
 procedure Helios is
+
+   ----------------------------------------------------------------------------
+   -- Camera clock using your PWM API
+   ----------------------------------------------------------------------------
+   Cam_External_Clock : PWM_T := Create (Channel => 0);
+    RESET_PIN : GPIO_Pin_T := Create_Pin (11);
+   ----------------------------------------------------------------------------
+   -- TWI peripheral (rename only, no alias)
+   ----------------------------------------------------------------------------
+   -- TWI : neorv32.TWI.TWI_Peripheral renames TWI_Periph;
+
+   ----------------------------------------------------------------------------
+   -- OV5640 camera I2C address
+   -- OV5640 7-bit address = 0x3C -> write address = 0x78
+   ----------------------------------------------------------------------------
+   OV5640_Addr_WR : neorv32.Byte := 16#79#;
+
+   ----------------------------------------------------------------------------
+   -- DCMD command codes
+   ----------------------------------------------------------------------------
+   CMD_NOP   : UInt2 := 2#00#;
+   CMD_START : UInt2 := 2#01#;
+   CMD_STOP  : UInt2 := 2#10#;
+   CMD_TRX   : UInt2 := 2#11#;
+
+   ----------------------------------------------------------------------------
+   -- Small helper: wait until TWI is not busy
+   ----------------------------------------------------------------------------
+   procedure TWI_Wait_Ready is
+   begin
+      while TWI_Periph.CTRL.TWI_CTRL_RX_AVAIL = 0 loop
+         null;
+      end loop;
+   end TWI_Wait_Ready;
+
 
    ----------------------------------------------------------------------------
    -- Camera clock using your PWM API
