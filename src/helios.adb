@@ -48,9 +48,8 @@ begin
    Ada.Text_IO.Put_Line ("Initializing Camera Clock...");
     RESET_PIN.Set;
 
-   Cam_External_Clock.Set_Hz (25_000_000.0);
-   Cam_External_Clock.Set_Duty_Cycle (0.5);
-   Cam_External_Clock.Enable;
+   Configure (Cam_External_Clock, 25_000_000.0, 0.5);
+   Enable(Cam_External_Clock);
 
    Ada.Text_IO.Put_Line ("Camera Clock ON (25MHz)");
    Ada.Text_IO.Put_Line ("Initializing TWI/I2C...");
