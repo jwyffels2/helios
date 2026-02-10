@@ -8,99 +8,44 @@ with Ada.Text_IO;
 
 procedure Helios is
    -- Create PWM
-   Pwm0      : PWM_T := Create(Channel => 0);
-   RESET_PIN : GPIO_Pin_T := Create_Pin (11);
-
-   ----------------------------------------------------------------------------
-   -- OV5640 camera I2C address
-   -- 7-bit address = 0x3C -> write address byte = 0x78
-   ----------------------------------------------------------------------------
-   OV5640_Addr_WR : neorv32.Byte := 16#78#;
-
-   ----------------------------------------------------------------------------
-   -- DCMD command codes (NEORV32 TWI)
-   ----------------------------------------------------------------------------
-   CMD_NOP   : UInt2 := 2#00#;
-   CMD_START : UInt2 := 2#01#;
-   CMD_STOP  : UInt2 := 2#10#;
-   CMD_TRX   : UInt2 := 2#11#;
-
-   ----------------------------------------------------------------------------
-   -- Wait until TWI engine is idle (BUSY=0)
-   ----------------------------------------------------------------------------
-   procedure TWI_Wait_Ready is
-   begin
-      while TWI_Periph.CTRL.TWI_CTRL_BUSY = 1 loop
-         null;
-      end loop;
-   end TWI_Wait_Ready;
-
-   ----------------------------------------------------------------------------
-   -- Wait until TX FIFO has space
-   ----------------------------------------------------------------------------
-   procedure TWI_Wait_Tx_Space is
-   begin
-      while TWI_Periph.CTRL.TWI_CTRL_TX_FULL = 1 loop
-         null;
-      end loop;
-   end TWI_Wait_Tx_Space;
-
-   ----------------------------------------------------------------------------
-   -- Send START + address(write) + STOP, return True if ACKed
-   ----------------------------------------------------------------------------
-   function Probe_OV5640 return Boolean is
-   begin
-      -- START
-      TWI_Periph.DCMD.TWI_DCMD_CMD := CMD_START;
-      TWI_Wait_Ready;
-
-      -- Send address byte
-      TWI_Wait_Tx_Space;
-      TWI_Periph.DCMD.TWI_DCMD     := OV5640_Addr_WR;
-      TWI_Periph.DCMD.TWI_DCMD_CMD := CMD_TRX;
-      TWI_Wait_Ready;
-
-      -- ACK bit: 0 = ACK, 1 = NACK
-      declare
-         Acked : constant Boolean := (TWI_Periph.DCMD.TWI_DCMD_ACK = 0);
-      begin
-         -- STOP (always)
-         TWI_Periph.DCMD.TWI_DCMD_CMD := CMD_STOP;
-         TWI_Wait_Ready;
-         return Acked;
-      end;
-   end Probe_OV5640;
-
+   Pwm0: PWM_T := PWM_API.Create (Channel => 0);
 begin
-   -- Configure PWM (camera clock)
-   Pwm0.Configure (25_000_000.0, 0.5);
+
+   Pwm0.Configure (Target_Hz => 25_000_000.0, Duty => 0.5);
    Pwm0.Enable;
 
-   Ada.Text_IO.Put_Line ("Initializing Camera Clock...");
-   RESET_PIN.Set;
-   Ada.Text_IO.Put_Line ("Camera Clock ON (25MHz)");
-   Ada.Text_IO.Put_Line ("Initializing TWI/I2C...");
 
-   ----------------------------------------------------------------------------
-   -- Configure TWI controller
-   ----------------------------------------------------------------------------
-   TWI_Periph.CTRL.TWI_CTRL_EN     := 0;
-   TWI_Periph.CTRL.TWI_CTRL_PRSC   := 3;
-   TWI_Periph.CTRL.TWI_CTRL_CDIV   := 3;
-   TWI_Periph.CTRL.TWI_CTRL_CLKSTR := 1; -- enable stretching is usually safer
-   TWI_Periph.CTRL.TWI_CTRL_EN     := 1;
 
-   Ada.Text_IO.Put_Line ("Probing OV5640...");
-
-   -- Try a few times (sensor might not be ready immediately after reset/clock)
-   for Attempt in 1 .. 10 loop
-      if Probe_OV5640 then
-         Ada.Text_IO.Put_Line ("OV5640 ACK received! Communication OK.");
-         exit;
-      else
-         Ada.Text_IO.Put_Line ("NO ACK from OV5640.");
-      end if;
-   end loop;
-
-   Ada.Text_IO.Put_Line ("TWI test complete.");
 end Helios;
+
+procedure twi_available return Boolean;
+procedure twi_setup(preScaler: Natural range 0 .. 7; clockDiv:Natural range 0 .. 15; allowClockStretching : Boolean);
+function  twi_get_fifo_depth return Integer;
+procedure twi_disable;
+procedure twi_enable;
+
+function  twi_sense_scl return Boolean; --Make subtype of boolean for high/low
+function  twi_sense_sda return Boolean;
+
+function twi_busy return Boolean;
+
+
+--   /**********************************************************************//**
+--   * Get received data + ACK/NACH from RX FIFO.
+--   *
+--   * @param[in,out] data Pointer for returned data (uint8_t).
+--   * @return RX FIFO access status (-1 = no data available, 0 = ACK received, 1 = NACK received).
+--   Should use return enum
+--   **************************************************************************/
+function twi_get (Data : out Integer);
+
+--   * @return 0: ACK received, 1: NACK received.
+--  Replace Ack_Next type and return type with Enum for Ack or subtype boolean
+function twi_transfer(Data: in out Integer; Ack_Next: in Boolean) return Integer;
+procedure twi_stop;
+procedure twi_start;
+
+procedure twi_send_nonblocking(Data: in Integer; Ack_Next: in Boolean);
+
+procedure twi_generate_start_nonblocking;
+procedure twi_generate_stop_nonblocking;
