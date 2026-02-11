@@ -15,3 +15,7 @@ dfx_runtime.txt
 /rtl/.Xil
 /rtl/ip/cam_clk/cam_clk.gen
 
+# Vivado XSim transient files
+xelab.pb
+xvhdl.pb
+

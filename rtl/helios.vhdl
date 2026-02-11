@@ -1,5 +1,6 @@
 library ieee;
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
 
 library neorv32;
 use neorv32.neorv32_package.all;
@@ -46,6 +47,31 @@ architecture rtl of helios is
     signal twi_scl_core_i : STD_ULOGIC;
     signal twi_scl_core_o : STD_ULOGIC;
 
+    -- ------------------------------------------------------------
+    -- NEORV32 XBUS <-> framebuffer (VRAM) signals
+    -- ------------------------------------------------------------
+    signal xbus_adr   : std_ulogic_vector(31 downto 0);
+    signal xbus_dat_o : std_ulogic_vector(31 downto 0);
+    signal xbus_we    : std_ulogic;
+    signal xbus_sel   : std_ulogic_vector(3 downto 0);
+    signal xbus_stb   : std_ulogic;
+    signal xbus_cyc   : std_ulogic;
+
+    signal xbus_dat_i : std_ulogic_vector(31 downto 0);
+    signal xbus_ack   : std_ulogic;
+    signal xbus_err   : std_ulogic := '0';
+
+    -- VRAM write-side interface (from bus slave to VRAM)
+    signal vram_cpu_we    : std_ulogic;
+    signal vram_cpu_be    : std_ulogic_vector(3 downto 0);
+    signal vram_cpu_addr  : unsigned(31 downto 0);
+    signal vram_cpu_wdata : std_ulogic_vector(31 downto 0);
+    signal vram_ready     : std_ulogic;
+
+    -- VRAM scanout side is not wired yet; keep idle.
+    signal vga_addr        : unsigned(14 downto 0) := (others => '0');
+    signal vga_pixel_debug : std_ulogic_vector(7 downto 0);
+
 begin
 
   ---------------------------------------------------------------------------
@@ -89,7 +115,10 @@ begin
 
       -- Enable TWI
 
-      IO_TWI_EN => true
+      IO_TWI_EN => true,
+
+      -- External bus for framebuffer MMIO window
+      XBUS_EN => true
 
       -- All other generics use defaults
 
@@ -107,18 +136,18 @@ begin
       jtag_tdo_o   => open,
       jtag_tms_i   => '0',
 
-      -- External bus (unused)
-      xbus_adr_o   => open,
-      xbus_dat_o   => open,
+      -- External bus (XBUS) -> framebuffer window
+      xbus_adr_o   => xbus_adr,
+      xbus_dat_o   => xbus_dat_o,
       xbus_cti_o   => open,
       xbus_tag_o   => open,
-      xbus_we_o    => open,
-      xbus_sel_o   => open,
-      xbus_stb_o   => open,
-      xbus_cyc_o   => open,
-      xbus_dat_i   => (others => '0'),
-      xbus_ack_i   => '0',
-      xbus_err_i   => '0',
+      xbus_we_o    => xbus_we,
+      xbus_sel_o   => xbus_sel,
+      xbus_stb_o   => xbus_stb,
+      xbus_cyc_o   => xbus_cyc,
+      xbus_dat_i   => xbus_dat_i,
+      xbus_ack_i   => xbus_ack,
+      xbus_err_i   => xbus_err,
 
       -- SLINK (unused)
       slink_rx_dat_i => (others => '0'),
@@ -193,6 +222,57 @@ begin
       mtime_irq_i  => '0',
       msw_irq_i    => '0',
       mext_irq_i   => '0'
+    );
+
+  ---------------------------------------------------------------------------
+  -- Framebuffer path (NEORV32 XBUS -> VRAM)
+  --
+  -- This adds an MMIO window at 0xF000_0000 that can be used by software to
+  -- write pixels into a small RGB332 framebuffer stored in BRAM.
+  -- VGA scanout is not wired yet; the VGA read port is held idle.
+  ---------------------------------------------------------------------------
+  u_vram_xbus : entity work.vram_xbus_slave
+    generic map (
+      BASE_ADDR => x"F0000000",
+      WIN_SIZE  => x"00005000"
+    )
+    port map (
+      clk_i => clk_i,
+      rstn_i => rstn_core,
+
+      xbus_cyc_i => xbus_cyc,
+      xbus_stb_i => xbus_stb,
+      xbus_we_i  => xbus_we,
+      xbus_adr_i => xbus_adr,
+      xbus_dat_i => xbus_dat_o,
+      xbus_sel_i => xbus_sel,
+
+      xbus_ack_o => xbus_ack,
+      xbus_dat_o => xbus_dat_i,
+
+      vram_ready_i => vram_ready,
+      cpu_we_o     => vram_cpu_we,
+      cpu_be_o     => vram_cpu_be,
+      cpu_addr_o   => vram_cpu_addr,
+      cpu_wdata_o  => vram_cpu_wdata
+    );
+
+  u_vram : entity work.vram_rgb332_dp
+    generic map (
+      FB_SIZE => 19200
+    )
+    port map (
+      clk_i => clk_i,
+      rstn_i => rstn_core,
+
+      cpu_we_i    => vram_cpu_we,
+      cpu_be_i    => vram_cpu_be,
+      cpu_addr_i  => vram_cpu_addr,
+      cpu_wdata_i => vram_cpu_wdata,
+      cpu_ready_o => vram_ready,
+
+      vga_addr_i  => vga_addr,
+      vga_rdata_o => vga_pixel_debug
     );
 
 
