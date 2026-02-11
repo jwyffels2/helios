@@ -1,11 +1,12 @@
 with Ada.Text_IO;
+with neorv32.SYSINFO; use neorv32.SYSINFO;
 
 package body TWI is
 
-   function twi_available return Boolean is
+   function TWI_Available return Boolean is
    begin
-      return false;
-   end twi_available;
+      return SYSINFO_Periph.SOC.SYSINFO_SOC_IO_TWI = 1;
+   end TWI_Available;
 
    procedure TWI_Setup (preScaler : Natural; clockDiv : Natural; allowClockStretching : Boolean) is
       Ctrl : UInt32 := 0;
@@ -20,12 +21,10 @@ package body TWI is
       TWI_Periph.CTRL.TWI_CTRL_EN := 1;
 
       -- Prescaler (3 bits)
-      TWI_Periph.CTRL.TWI_CTRL_PRSC :=
-      neorv32.UInt3 (PreScaler mod 8);
+      TWI_Periph.CTRL.TWI_CTRL_PRSC := neorv32.UInt3 (PreScaler mod 8);
 
       -- Clock divider (4 bits)
-      TWI_Periph.CTRL.TWI_CTRL_CDIV :=
-      neorv32.UInt4 (ClockDiv mod 16);
+      TWI_Periph.CTRL.TWI_CTRL_CDIV := neorv32.UInt4 (ClockDiv mod 16);
 
       -- Clock stretching
       if AllowClockStretching then
@@ -35,36 +34,40 @@ package body TWI is
       end if;
    end TWI_Setup;
 
-   function twi_get_fifo_depth return Integer is
+   function TWI_Get_FIFO_Depth return Integer is
+      Depth_Log2 : constant Natural := Natural (TWI_Periph.CTRL.TWI_CTRL_FIFO);
    begin
-      return -1;
-   end twi_get_fifo_depth;
+      if Depth_Log2 = 0 then
+         return 0;
+      else
+         return Integer (2 ** Depth_Log2);
+      end if;
+   end TWI_Get_FIFO_Depth;
 
-   procedure twi_disable is
+   procedure TWI_Enable is
    begin
-      null;
-   end twi_disable;
+      TWI_Periph.CTRL.TWI_CTRL_EN := 1;
+   end TWI_Enable;
 
-   procedure twi_enable is
+   procedure TWI_Disable is
    begin
-      null;
-   end twi_enable;
+      TWI_Periph.CTRL.TWI_CTRL_EN := 0;
+   end TWI_Disable;
 
-   function  twi_sense_scl return Boolean is --Make subtype of boolean for high/low
+   function TWI_Sense_SDA return Boolean is
    begin
-      return false;
-   end twi_sense_scl;
+      return TWI_Periph.CTRL.TWI_CTRL_SENSE_SDA = 1;
+   end TWI_Sense_SDA;
 
-   function  twi_sense_sda return Boolean is
+   function TWI_Sense_SCL return Boolean is --Make subtype of boolean for high/low
    begin
-      return false;
-   end twi_sense_sda;
+      return TWI_Periph.CTRL.TWI_CTRL_SENSE_SCL = 1;
+   end TWI_Sense_SCL;
 
-   function twi_busy return Boolean is
+   function TWI_Busy return Boolean is
    begin
-      return false;
-   end twi_busy;
-
+      return TWI_Periph.CTRL.TWI_CTRL_BUSY = 1;
+   end TWI_Busy;
 
    --   /**********************************************************************//**
    --   * Get received data + ACK/NACH from RX FIFO.

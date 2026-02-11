@@ -8,16 +8,16 @@ package TWI is
    TWI_CMD_STOP  : constant TWI_Command := 2;
    TWI_CMD_RTX   : constant TWI_Command := 3;
 
-   function twi_available return Boolean;
+   function TWI_Available return Boolean;
    procedure TWI_Setup (preScaler : Natural; clockDiv : Natural; allowClockStretching : Boolean);
-   function  twi_get_fifo_depth return Integer;
-   procedure twi_disable;
-   procedure twi_enable;
+   function  TWI_Get_FIFO_Depth return Integer;
+   procedure TWI_Enable;
+   procedure TWI_Disable;
 
-   function  twi_sense_scl return Boolean; --Make subtype of boolean for high/low
-   function  twi_sense_sda return Boolean;
+   function  TWI_Sense_SDA return Boolean;
+   function  TWI_Sense_SCL return Boolean; --Make subtype of boolean for high/low
 
-   function twi_busy return Boolean;
+   function TWI_Busy return Boolean;
 
    --   /**********************************************************************//**
    --   * Get received data + ACK/NACH from RX FIFO.
