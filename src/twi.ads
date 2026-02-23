@@ -52,6 +52,6 @@ package TWI is
 
     -- Use subtype and restrict Device_Address to be 7 bits
     procedure I2C_Write(Device_Address: I2C_Addr7; Register:UInt16; Value:  Integer);
-    --  function  I2C_Read(Device_Address: I2C_Addr7; Register:Integer; Data:  Integer) return Integer;
+    function  I2C_Read(Device_Address: I2C_Addr7; Register:UInt16) return Integer;
     function I2C_Ping (Device_Address : I2C_Addr7) return Boolean;
 end TWI;

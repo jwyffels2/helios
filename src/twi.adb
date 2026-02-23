@@ -1,6 +1,8 @@
 with Ada.Text_IO;
 with neorv32.SYSINFO; use neorv32.SYSINFO;
 with neorv32; use neorv32;
+with Uart0; use Uart0;
+
 package body TWI is
 
     function TWI_Available return Boolean is
@@ -221,6 +223,7 @@ package body TWI is
     Data  : Integer := Value;
     Ack   : Integer;
     begin
+        Ada.Text_IO.Put_Line ("Start Writing");
         TWI_Generate_Start;
         Ack := TWI_Transfer (Write_Address, False);
         if Ack /= 0 then
@@ -244,16 +247,70 @@ package body TWI is
         Ack := TWI_Transfer (Data, False);
 
         TWI_Generate_Stop;
+        Ada.Text_IO.Put_Line ("End Writing");
+
 
     end I2C_Write;
 
-    --  function I2C_Read (Device_Address : Integer; Register : Integer; Data : Integer) return Integer
-    --  is
-    --  Read_Address : Integer := Shift_Left (Device_Address, 1) + 1 ;
-    --  RegHi : Integer := Shift_Right (Register, 8) and 16#FF#;
-    --  RegLo : Integer := Register and 16#FF#;
-    --  begin
-    --  end I2C_Read;
+    function I2C_Read (Device_Address : I2C_Addr7; Register : UInt16) return Integer
+    is
+
+    Dev_Address : I2C_Addr7 := Device_Address;
+    Write_Address : Integer := Integer(Shift_Left (Device_Address, 1));
+    Read_Address : Integer := Integer(Shift_Left (Device_Address, 1) + 1) ;
+    RegHi : Integer := Integer(Shift_Right (Register, 8) and 16#FF#);
+    RegLo : Integer := Integer(Register and 16#FF#);
+    Data  : Integer;
+    Ack   : Integer;
+
+    begin
+        Ada.Text_IO.Put_Line ("Start Writing");
+        TWI_Generate_Start;
+        Ack := TWI_Transfer (Write_Address, False);
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
+
+        Ack := TWI_Transfer (RegHi, False);
+
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
+
+        Ack := TWI_Transfer (RegLo, False);
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
+        Ada.Text_IO.Put_Line ("Start Again!");
+
+        TWI_Generate_Start;
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
+        Ada.Text_IO.Put_Line ("Start Reading!");
+
+        Ack := TWI_Transfer (Read_Address, False);
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
+
+        Ack := TWI_Transfer (Data, True); -- True => NACK after receive (last byte)
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
+        Ada.Text_IO.Put_Line ("Read Data: " & Data'Image);
+
+        TWI_Generate_Stop;
+        return Data;
+
+
+    end I2C_Read;
 
     function I2C_Ping (Device_Address : I2C_Addr7) return Boolean
     is
