@@ -217,6 +217,6 @@ Each line below represents 8 clock pulses.
 
 ## Sources
 
-[https://www.analog.com/en/resources/technical-articles/i2c-primer-what-is-i2c-part-1.html](Analog Article)
+[Analog Article](https://www.analog.com/en/resources/technical-articles/i2c-primer-what-is-i2c-part-1.html)
 
-[https://www.ti.com/lit/an/sbaa565/sbaa565.pdf?ts=1770750268517](Texas Instruments Basic I2C Guide)
+[Texas Instruments Basic I2C Guide](https://www.ti.com/lit/an/sbaa565/sbaa565.pdf?ts=1770750268517)
