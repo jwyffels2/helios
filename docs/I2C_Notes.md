@@ -129,8 +129,6 @@ After **every 8-bit byte**, the receiver must respond.
 | LOW       | Transmitter sets next bit     |
 | HIGH      | Receiver reads bit            |
 
-### Important
-
 - SDA must remain stable while SCL is HIGH
 - Receiver samples data when SCL is HIGH
 - Transmitter changes data when SCL is LOW
