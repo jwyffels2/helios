@@ -19,6 +19,9 @@
 - Both require **open-drain (open-collector) configuration**
 - External **pull-up resistors** keep lines HIGH by default
 - Devices pull lines LOW when transmitting
+- **SCL is ALWAYS controlled by the Master**
+- SDA control switches between Master and Slave
+- Master acts as traffic controller
 
 ### Default Bus State (Idle)
 
@@ -196,12 +199,6 @@ Each line below represents 8 clock pulses.
     [NACK]   <- Master signals done
 
     [STOP]
-
-## Important Control Rule
-
-- **SCL is ALWAYS controlled by the Master**
-- SDA control switches between Master and Slave
-- Master acts as traffic controller
 
 ## Quick Summary
 
