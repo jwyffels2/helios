@@ -214,3 +214,9 @@ Each line below represents 8 clock pulses.
 - Data read when SCL HIGH
 - Every byte requires ACK
 - Master controls clock at all times
+
+## Sources
+
+[https://www.analog.com/en/resources/technical-articles/i2c-primer-what-is-i2c-part-1.html](Analog Article)
+
+[https://www.ti.com/lit/an/sbaa565/sbaa565.pdf?ts=1770750268517](Texas Instruments Basic I2C Guide)
