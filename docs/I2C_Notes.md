@@ -212,7 +212,7 @@ Each line below represents 8 clock pulses.
 
 ## Sniffing I²C Link
 
-See guide [here](Logic_Analyzer_Guide.md) with pulse view
+See guide [here](Logic_Analyzer_Guide.md#3-configure-i2c-decoding) with pulse view
 
 ## Sources
 
