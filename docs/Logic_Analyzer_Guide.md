@@ -97,5 +97,5 @@ Once that is done you are good to sniff by hitting Run at the top!!!
 4. Device names can change after reconnecting (for example, channel count display may differ).
 
 ## Sources
-[Logic Analyzer Used In Guide](https://www.sparkfun.com/usb-logic-analyzer-24mhz-8-channel.html)
-[Setting Up Logic Analyzer With Pulseview Guide](https://learn.sparkfun.com/tutorials/using-the-usb-logic-analyzer-with-sigrok-pulseview)
+- [Logic Analyzer Used In Guide](https://www.sparkfun.com/usb-logic-analyzer-24mhz-8-channel.html)
+- [Setting Up Logic Analyzer With Pulseview Guide](https://learn.sparkfun.com/tutorials/using-the-usb-logic-analyzer-with-sigrok-pulseview)
