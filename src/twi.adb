@@ -293,7 +293,7 @@ package body TWI is
         end if;
         Ada.Text_IO.Put_Line ("Start Reading!");
 
-        Ack := TWI_Transfer (Read_Address, False);
+        Ack := TWI_Transfer (Read_Address, True);
         if Ack /= 0 then
             TWI_Generate_Stop;
             return -1;

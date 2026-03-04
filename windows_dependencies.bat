@@ -1,5 +1,13 @@
 @echo off
 set "WSL_VERSION=2"
+
+set SIGROK_DIR=%ProgramFiles%\sigrok\sigrok-cli
+set PULSEVIEW_DIR=%ProgramFiles%\sigrok\PulseView
+
+set SIGROK_EXE=%SIGROK_DIR%\sigrok-cli.exe
+set PULSEVIEW_EXE=%PULSEVIEW_DIR%\pulseview.exe
+
+pushd "%~dp0"
 :: --- Require Administrator ---
 net session >nul 2>&1
 if errorlevel 1 (
@@ -30,6 +38,38 @@ wsl --set-default-version %WSL_VERSION% >nul 2>&1
 winget install --id RedHat.Podman --version 5.6.2 --accept-package-agreements --accept-source-agreements
 winget install --id AdaLang.Alire.Portable --version 2.1.0 --accept-package-agreements --accept-source-agreements
 
+:: ---------------------------
+:: Install sigrok-cli
+:: ---------------------------
+IF EXIST "%SIGROK_EXE%" (
+    echo sigrok-cli already installed
+) ELSE (
+    echo Downloading sigrok-cli...
+    curl -L -o sigrok-cli.exe https://sigrok.org/download/binary/sigrok-cli/sigrok-cli-0.7.2-x86_64-installer.exe
+
+    echo Installing sigrok-cli...
+    sigrok-cli.exe /S
+    del sigrok-cli.exe
+)
+
+:: ---------------------------
+:: Install PulseView
+:: ---------------------------
+IF EXIST "%PULSEVIEW_EXE%" (
+    echo PulseView already installed
+) ELSE (
+    echo Downloading PulseView...
+    curl -L -o pulseview.exe https://sigrok.org/download/binary/pulseview/pulseview-0.4.2-64bit-static-release-installer.exe
+
+    echo Installing PulseView...
+    pulseview.exe /S
+    del pulseview.exe
+)
+
+echo.
+echo Installation complete
+echo Restart terminal to use sigrok-cli
+
 :: ---- Refresh PATH into the *current* cmd.exe ----
 for /f "usebackq delims=" %%P in (`
   powershell -NoProfile -Command ^
@@ -39,3 +79,5 @@ for /f "usebackq delims=" %%P in (`
 `) do set "PATH=%%P"
 rem Now this should work without opening a new window:
 alr --non-interactive toolchain --select
+popd
+pause
