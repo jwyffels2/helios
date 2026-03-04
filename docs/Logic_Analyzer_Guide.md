@@ -85,6 +85,8 @@ Your analyzer is now ready to capture signals.
 
 ![Channel configuration window for I²C](Logic_Analyzers_Guide_Resources/I2C_Configure_Channel.png)
 
+Once that is done you are good to sniff by hitting Run at the top!!!
+
 ## FAQ
 
 ### PulseView cannot find my analyzer after unplugging/replugging
