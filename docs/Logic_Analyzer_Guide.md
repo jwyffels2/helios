@@ -93,3 +93,7 @@ Your analyzer is now ready to capture signals.
 2. Re-run the PulseView **Connect to Device** scan.
 3. If still missing, reinstall the Zadig driver for that device.
 4. Device names can change after reconnecting (for example, channel count display may differ).
+
+## Sources
+[Logic Analyzer Used In Guide](https://www.sparkfun.com/usb-logic-analyzer-24mhz-8-channel.html)
+[Setting Up Logic Analyzer With Pulseview Guide](https://learn.sparkfun.com/tutorials/using-the-usb-logic-analyzer-with-sigrok-pulseview)
