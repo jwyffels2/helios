@@ -210,6 +210,10 @@ Each line below represents 8 clock pulses.
 - Every byte requires ACK
 - Master controls clock at all times
 
+## Sniffing I²C Link
+
+See guide [here](Logic_Analyzer_Guide.md) with pulse view
+
 ## Sources
 
 - [Analog Article](https://www.analog.com/en/resources/technical-articles/i2c-primer-what-is-i2c-part-1.html)
