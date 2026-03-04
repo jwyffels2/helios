@@ -58,10 +58,10 @@ This guide walks through installing drivers and connecting a USB logic analyzer 
 
 Your analyzer is now ready to capture signals.
 
-## 3. Configure I2C Decoding
+## 3. Configure I²C Decoding
 
 1. Set sample configuration first.
-   - Recommended starting point: `10 MHz` sample rate for standard I2C debugging.
+   - Recommended starting point: `10 MHz` sample rate for standard I²C debugging.
    - Increase sample rate if you are analyzing faster buses.
 
 ![Screenshot of sample rate settings in PulseView](Logic_Analyzers_Guide_Resources/I2C_Sample_Rate_Config.png)
@@ -72,18 +72,18 @@ Your analyzer is now ready to capture signals.
 
 3. Search for `I2C` and double-click it.
 
-![Image showing searching I2C in the decoder menu](Logic_Analyzers_Guide_Resources/I2C_Decoder_Search.png)
+![Image showing searching I²C in the decoder menu](Logic_Analyzers_Guide_Resources/I2C_Decoder_Search.png)
 
-4. Confirm the I2C decoder appears in the channel list.
+4. Confirm the I²C decoder appears in the channel list.
 
-![I2C channel appearing in the main UI window](Logic_Analyzers_Guide_Resources/I2C_Channel_Main_Window_Appearing.png)
+![I²C channel appearing in the main UI window](Logic_Analyzers_Guide_Resources/I2C_Channel_Main_Window_Appearing.png)
 
 5. Configure channel mapping:
    - `SDA` -> data line
    - `SCL` -> clock line
    - Optional: set colors for readability
 
-![Channel configuration window for I2C](Logic_Analyzers_Guide_Resources/I2C_Configure_Channel.png)
+![Channel configuration window for I²C](Logic_Analyzers_Guide_Resources/I2C_Configure_Channel.png)
 
 ## FAQ
 
