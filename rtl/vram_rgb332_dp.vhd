@@ -120,7 +120,7 @@ begin
           -- Only low 15 bits are meaningful for 19200 bytes of VRAM.
           -- Align to 32-bit word boundary so byte-enables map to the correct
           -- byte address for sub-word CPU stores (SB/SH).
-          pend_addr <= unsigned(std_logic_vector(cpu_addr_i(14 downto 2)) & "00");
+          pend_addr <= cpu_addr_i(14 downto 0) and to_unsigned (16#7FFC#, 15);
 
           pend_data <= cpu_wdata_i;
           pend_be   <= cpu_be_i;
