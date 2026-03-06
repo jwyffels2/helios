@@ -145,6 +145,46 @@ begin
          report "Word write byte 3 mismatch"
          severity failure;
 
+      cpu_addr_i  <= to_unsigned (Fb_Size_C - 1, cpu_addr_i'length);
+      cpu_be_i    <= "1000";
+      cpu_wdata_i <= x"5A000000";
+      cpu_we_i    <= '1';
+      wait until rising_edge (clk_i);
+      cpu_we_i    <= '0';
+      cpu_be_i    <= (others => '0');
+      cpu_wdata_i <= (others => '0');
+      while cpu_ready_o = '0' loop
+         wait until rising_edge (clk_i);
+      end loop;
+      vga_addr_i <= to_unsigned (Fb_Size_C - 1, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"5A";
+      end loop;
+      assert vga_rdata_o = x"5A"
+         report "Boundary write at FB_SIZE-1 failed"
+         severity failure;
+
+      cpu_addr_i  <= to_unsigned (Fb_Size_C, cpu_addr_i'length);
+      cpu_be_i    <= "0001";
+      cpu_wdata_i <= x"000000EE";
+      cpu_we_i    <= '1';
+      wait until rising_edge (clk_i);
+      cpu_we_i    <= '0';
+      cpu_be_i    <= (others => '0');
+      cpu_wdata_i <= (others => '0');
+      while cpu_ready_o = '0' loop
+         wait until rising_edge (clk_i);
+      end loop;
+      vga_addr_i <= to_unsigned (Fb_Size_C - 1, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"5A";
+      end loop;
+      assert vga_rdata_o = x"5A"
+         report "Out-of-range write modified FB_SIZE-1 byte"
+         severity failure;
+
       report "tb_vram_rgb332_dp passed" severity note;
       done <= true;
       wait for 2 * Clk_Period;

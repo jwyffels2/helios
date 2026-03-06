@@ -200,6 +200,114 @@ begin
          report "XBUS word write byte 3 mismatch"
          severity failure;
 
+      xbus_adr_i <= std_ulogic_vector (Base_Addr_C + to_unsigned (8, 32));
+      xbus_dat_i <= x"A1B2C3D4";
+      xbus_sel_i <= "1111";
+      xbus_we_i  <= '1';
+      xbus_cyc_i <= '1';
+      xbus_stb_i <= '1';
+      wait until rising_edge (clk_i);
+      Ack_Seen := (xbus_ack_o = '1');
+      for I in 1 to 20 loop
+         exit when Ack_Seen;
+         wait until rising_edge (clk_i);
+         Ack_Seen := (xbus_ack_o = '1');
+      end loop;
+      assert Ack_Seen report "XBUS seed write ack timeout" severity failure;
+      xbus_cyc_i <= '0';
+      xbus_stb_i <= '0';
+      xbus_we_i  <= '0';
+      xbus_sel_i <= (others => '0');
+      xbus_dat_i <= (others => '0');
+      wait until rising_edge (clk_i);
+
+      vga_addr_i <= to_unsigned (8, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"D4";
+      end loop;
+      assert vga_rdata_o = x"D4"
+         report "XBUS seed write byte 0 mismatch"
+         severity failure;
+      vga_addr_i <= to_unsigned (9, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"C3";
+      end loop;
+      assert vga_rdata_o = x"C3"
+         report "XBUS seed write byte 1 mismatch"
+         severity failure;
+      vga_addr_i <= to_unsigned (10, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"B2";
+      end loop;
+      assert vga_rdata_o = x"B2"
+         report "XBUS seed write byte 2 mismatch"
+         severity failure;
+      vga_addr_i <= to_unsigned (11, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"A1";
+      end loop;
+      assert vga_rdata_o = x"A1"
+         report "XBUS seed write byte 3 mismatch"
+         severity failure;
+
+      xbus_adr_i <= std_ulogic_vector (Base_Addr_C + to_unsigned (8, 32));
+      xbus_dat_i <= x"55667788";
+      xbus_sel_i <= "0000";
+      xbus_we_i  <= '1';
+      xbus_cyc_i <= '1';
+      xbus_stb_i <= '1';
+      wait until rising_edge (clk_i);
+      Ack_Seen := (xbus_ack_o = '1');
+      for I in 1 to 20 loop
+         exit when Ack_Seen;
+         wait until rising_edge (clk_i);
+         Ack_Seen := (xbus_ack_o = '1');
+      end loop;
+      assert Ack_Seen report "XBUS zero-select write ack timeout" severity failure;
+      xbus_cyc_i <= '0';
+      xbus_stb_i <= '0';
+      xbus_we_i  <= '0';
+      xbus_sel_i <= (others => '0');
+      xbus_dat_i <= (others => '0');
+      wait until rising_edge (clk_i);
+
+      vga_addr_i <= to_unsigned (8, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"D4";
+      end loop;
+      assert vga_rdata_o = x"D4"
+         report "XBUS zero-select write changed byte 0"
+         severity failure;
+      vga_addr_i <= to_unsigned (9, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"C3";
+      end loop;
+      assert vga_rdata_o = x"C3"
+         report "XBUS zero-select write changed byte 1"
+         severity failure;
+      vga_addr_i <= to_unsigned (10, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"B2";
+      end loop;
+      assert vga_rdata_o = x"B2"
+         report "XBUS zero-select write changed byte 2"
+         severity failure;
+      vga_addr_i <= to_unsigned (11, vga_addr_i'length);
+      for I in 1 to 8 loop
+         wait until rising_edge (clk_i);
+         exit when vga_rdata_o = x"A1";
+      end loop;
+      assert vga_rdata_o = x"A1"
+         report "XBUS zero-select write changed byte 3"
+         severity failure;
+
       xbus_adr_i <= std_ulogic_vector (Base_Addr_C + to_unsigned (0, 32));
       xbus_we_i  <= '0';
       xbus_cyc_i <= '1';
