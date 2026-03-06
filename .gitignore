@@ -18,4 +18,6 @@ dfx_runtime.txt
 # Vivado XSim transient files
 xelab.pb
 xvhdl.pb
+rtl/tb/xsim.dir/
+rtl/tb/*.wdb
 
