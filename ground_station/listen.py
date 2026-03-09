@@ -3,7 +3,9 @@ Simple example program that listens for MIN frames and reassembles JPEG images
 sent as START (ID=10), CHUNK (ID=11), END (ID=12).
 """
 import sys
-sys.path.append(r"third_party/min/host/")
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "third_party" / "min" / "host"))
 from struct import unpack
 from time import sleep, time
 
