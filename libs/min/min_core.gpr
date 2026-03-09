@@ -1,0 +1,16 @@
+project Min_Core is
+
+   for Languages use ("C");
+
+   for Source_Dirs use ("../../third_party/min/target", "src");
+   for Object_Dir use "obj/core";
+   for Create_Missing_Dirs use "True";
+   for Library_Name use "min_core";
+   for Library_Dir use "lib/core";
+   for Library_Kind use "static";
+
+   package Compiler is
+      for Default_Switches ("C") use ("-std=c99", "-I../../third_party/min/target", "-Isrc");
+   end Compiler;
+
+end Min_Core;

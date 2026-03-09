@@ -1,0 +1,10 @@
+name = "min"
+description = "Shared MIN transport wrappers for Helios"
+version = "0.1.0-dev"
+
+authors = ["Justin Wyffels"]
+maintainers = ["Justin Wyffels <justinwyffels@gmail.com>"]
+maintainers-logins = ["jwyffels2"]
+licenses = "MIT OR Apache-2.0 WITH LLVM-exception"
+website = ""
+tags = ["embedded", "uart", "protocol"]
