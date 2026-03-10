@@ -1,5 +1,6 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
+$AttachSettleDelaySeconds = 1
 
 function Test-IsAdmin {
     $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -19,9 +20,9 @@ function Get-VidPid([string]$InstanceId) {
     ""
 }
 
-function Get-DeviceState($d) {
-    if (-not [string]::IsNullOrWhiteSpace($d.ClientIPAddress)) { return "Attached" }
-    if (-not [string]::IsNullOrWhiteSpace($d.PersistedGuid))   { return "Shared" }
+function Get-DeviceState($device) {
+    if (-not [string]::IsNullOrWhiteSpace($device.ClientIPAddress)) { return "Attached" }
+    if (-not [string]::IsNullOrWhiteSpace($device.PersistedGuid))   { return "Shared" }
     return "Not shared"
 }
 
@@ -112,39 +113,57 @@ function Parse-Indexes([string]$Text, [array]$Devices) {
 }
 
 function Invoke-DeviceAction([string]$Verb, [array]$Selected) {
-    foreach ($d in $Selected) {
+    foreach ($device in $Selected) {
         switch ($Verb) {
             "b" {
-                if ($d.State -ne "Not shared") {
-                    Write-Host "Skipping $($d.Index): already $($d.State)"
+                if ($device.State -ne "Not shared") {
+                    Write-Host "Skipping $($device.Index): already $($device.State)"
                     continue
                 }
-                Write-Host "Binding $($d.BusId)..."
-                usbipd.exe bind --busid $d.BusId
+                Write-Host "Binding $($device.BusId)..."
+                usbipd.exe bind --busid $device.BusId
             }
             "a" {
-                if ($d.State -eq "Attached") {
-                    Write-Host "Skipping $($d.Index): already Attached"
+                $current = Get-UsbDevices | Where-Object { $_.BusId -eq $device.BusId } | Select-Object -First 1
+                if (-not $current) {
+                    Write-Host "Skipping $($device.Index): device $($device.BusId) not found in usbipd state"
                     continue
                 }
-                Write-Host "Attaching $($d.BusId)..."
-                usbipd.exe attach --wsl --busid $d.BusId
+
+                if ($current.State -eq "Attached") {
+                    Write-Host "Skipping $($device.Index): already Attached"
+                    continue
+                }
+
+                if ($current.State -eq "Not shared") {
+                    Write-Host "Binding $($device.BusId) before attach..."
+                    usbipd.exe bind --busid $device.BusId
+
+                    $current = Get-UsbDevices | Where-Object { $_.BusId -eq $device.BusId } | Select-Object -First 1
+                    if (-not $current -or $current.State -eq "Not shared") {
+                        Write-Host "Skipping $($device.Index): bind did not succeed for $($device.BusId)"
+                        continue
+                    }
+                }
+
+                Write-Host "Attaching $($device.BusId)..."
+                usbipd.exe attach --wsl --busid $device.BusId
             }
             "d" {
-                if ($d.State -ne "Attached") {
-                    Write-Host "Skipping $($d.Index): not Attached"
+                if ($device.State -ne "Attached") {
+                    Write-Host "Skipping $($device.Index): not Attached"
                     continue
                 }
-                Write-Host "Detaching $($d.BusId)..."
-                usbipd.exe detach --busid $d.BusId
+                Write-Host "Detaching $($device.BusId)..."
+                usbipd.exe detach --busid $device.BusId
             }
             "u" {
-                if ($d.State -notin @("Shared","Attached")) {
-                    Write-Host "Skipping $($d.Index): not Shared/Attached"
+                if ($device.State -notin @("Shared","Attached")) {
+                    Write-Host "Skipping $($device.Index): not Shared/Attached"
                     continue
                 }
-                Write-Host "Unbinding $($d.BusId)..."
-                usbipd.exe unbind --busid $d.BusId
+                Write-Host "Unbinding $($device.BusId)..."
+                usbipd.exe unbind --busid $device.BusId
             }
         }
     }
@@ -192,6 +211,8 @@ while ($true) {
         Invoke-DeviceAction $verb $selected
 
         if ($verb -eq "a") {
+            Write-Host ""
+            Start-Sleep -Seconds $AttachSettleDelaySeconds
             Write-Host ""
             Write-Host "WSL devices after attach:"
             Write-Host "---------------------------------------------------------"

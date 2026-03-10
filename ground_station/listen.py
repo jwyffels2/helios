@@ -2,6 +2,7 @@
 Simple example program that listens for MIN frames and reassembles JPEG images
 sent as START (ID=10), CHUNK (ID=11), END (ID=12).
 """
+import os
 import sys
 from pathlib import Path
 
@@ -11,8 +12,9 @@ from time import sleep, time
 
 from min import MINTransportSerial
 
-# Windows randomly assigns COM ports, depending on the driver for the USB serial chip.
-MIN_PORT = 'COM6'
+# Default to Linux container serial mapping, but allow override for local runs.
+MIN_PORT = os.getenv("MIN_PORT")
+assert MIN_PORT , "NO MIN_PORT Set"
 
 # Must match flight-side: MAX_PAYLOAD=255, CHUNK header=4 bytes => 251 data bytes per chunk
 CHUNK_DATA_MAX = 251
