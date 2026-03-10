@@ -18,11 +18,11 @@ Write-Host ''
 $rootless = (& podman info --format "{{.Host.Security.Rootless}}" 2>$null | Out-String).Trim()
 
 if ([string]::IsNullOrWhiteSpace($rootless)) {
-    throw "Failed to query Podman rootless status. Ensure Podman is installed and available in PATH."
+    throw "Failed to query Podman rootless status. Ensure Podman is installed and available in PATH and also turned on."
 }
 
 if ($rootless -ne 'false') {
-    throw "Podman must be rootful"
+    throw "Podman must be rootful first stop podman by running; podman machine stop; podman machine set --rootful=True"
 }
 
 podman build -t helios-listener:latest -f $RepoRoot/ground_station/listener.dockerfile .
