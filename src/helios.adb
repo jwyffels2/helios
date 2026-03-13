@@ -1,14 +1,23 @@
-with Uart0;
+with Uart0;         -- Pulls in uart0.ads
 with Gnat_Exit;
-with PWM_API; use PWM_API;
+with min;
 
 procedure Helios is
-   -- Create PWM
-   Pwm0 : PWM_T := Create(Channel => 0);
+
 begin
-   -- Configure PWM
-   Pwm0.Set_Hz(5.0);
-   Pwm0.Set_Duty_Cycle(0.5);
-   Pwm0.Enable;
+
+    -- Initialize uart
+    Uart0.Init (19200);
+
+    -- Initialize min
+    min.Init;
+
+    -- Send test message
+    min.Send_Test;
+
+    -- Loop to prevent program exit
+    loop
+        Min.Send_Test;
+    end loop;
 
 end Helios;
