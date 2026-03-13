@@ -1,3 +1,6 @@
 [submodule "third_party/helios-neorv32-setups"]
 	path = third_party/helios-neorv32-setups
 	url = https://github.com/calvin-nordstrom/helios-neorv32-setups.git
+[submodule "third_party/min"]
+	path = third_party/min
+	url = https://github.com/jwyffels2/min.git

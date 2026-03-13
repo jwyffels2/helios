@@ -53,7 +53,8 @@ set_property PACKAGE_PIN R18 [get_ports {gpio_i[11]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_i[*]}]
 
-
+################################
+################################
 # Camera External Clock PWM
 set_property PACKAGE_PIN K17 [get_ports pwm_o[0]]
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]

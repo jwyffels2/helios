@@ -37,6 +37,7 @@ wsl --set-default-version %WSL_VERSION% >nul 2>&1
 :: --- Install Podman ---
 winget install --id RedHat.Podman --version 5.6.2 --accept-package-agreements --accept-source-agreements
 winget install --id AdaLang.Alire.Portable --version 2.1.0 --accept-package-agreements --accept-source-agreements
+winget install --id dorssel.usbipd-win --version 5.3.0 --accept-package-agreements --accept-source-agreements
 
 :: ---------------------------
 :: Install sigrok-cli
