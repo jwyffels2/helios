@@ -40,4 +40,10 @@ begin
 
     end if;
 
+    --  Ada.Text_IO.Put_Line ("Chip ID High:" &
+    --      I2C_Read (CAMERA_ADDRESS, 16#300A#)'Image);
+
+    --  Ada.Text_IO.Put_Line ("Chip ID Low:" &
+    --      I2C_Read (CAMERA_ADDRESS, 16#300B#)'Image);
+
 end Helios;

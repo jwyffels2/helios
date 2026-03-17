@@ -260,7 +260,7 @@ package body TWI is
     Read_Address : Integer := Integer(Shift_Left (Device_Address, 1) + 1) ;
     RegHi : Integer := Integer(Shift_Right (Register, 8) and 16#FF#);
     RegLo : Integer := Integer(Register and 16#FF#);
-    Data  : Integer;
+    Data  : Integer := 16#FF#;
     Ack   : Integer;
 
     begin
