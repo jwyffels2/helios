@@ -2,26 +2,18 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- ============================================================
--- BRAM-inferable VRAM for 160x120 RGB332 (19200 bytes)
+-- This module stores the framebuffer itself.
+-- Each pixel is one RGB332 byte, so the BRAM is modeled as a byte array.
 --
--- Memory is byte-wide (RGB332 per pixel).
--- VGA side reads 1 byte per pixel with 1-cycle registered latency.
+-- The CPU-facing side accepts a 32-bit word plus byte enables because that is
+-- how NEORV32 drives XBUS writes. Rather than infer a more complex multi-port
+-- or write-mask memory, we serialize the enabled lanes and perform one byte
+-- write per clock. That keeps synthesis predictable and makes the ready/ack
+-- behavior easy to reason about in simulation.
 --
--- CPU side presents a 32-bit write + byte enables (BE).
--- Internally, we serialize this into *one byte write per cycle* to keep
--- the RAM inference template simple and deterministic.
---
--- Addressing:
---   cpu_addr_i is a BYTE address within the VRAM window.
---   Only the low 15 bits are used (0..FB_SIZE-1).
---   Internally we align to a 32-bit word boundary (addr & ~3) and then write
---   base + lane_index (0..3) for each enabled byte lane.
---
--- Reset:
---   rstn_i is active-low. It resets only internal control/latched state; the
---   VRAM contents are not cleared.
--- ============================================================
+-- The VGA-side read port already exists so scanout can be added later. For the
+-- current bring-up phase, the top level holds that side idle and uses this
+-- module only as VRAM storage for software writes.
 entity vram_rgb332_dp is
   generic (
     FB_SIZE : integer := 19200
@@ -45,9 +37,8 @@ end entity;
 
 architecture rtl of vram_rgb332_dp is
 
-  -- ------------------------------------------------------------
-  -- Byte-wide framebuffer memory
-  -- ------------------------------------------------------------
+  -- Byte-wide framebuffer memory. Keeping the array element width at 8 bits
+  -- matches the RGB332 storage format directly.
   type ram_t is array (0 to FB_SIZE-1) of std_ulogic_vector(7 downto 0);
   signal ram : ram_t := (others => (others => '0'));
 
@@ -55,20 +46,21 @@ architecture rtl of vram_rgb332_dp is
   attribute ram_style : string;
   attribute ram_style of ram : signal is "block";
 
-  -- Registered VGA read output (1-cycle latency)
+  -- Registered VGA read output so scanout sees a stable one-cycle-late pixel.
   signal vga_rdata_r : std_ulogic_vector(7 downto 0) := (others => '0');
 
-  -- ------------------------------------------------------------
-  -- Pending CPU write transaction (serialized to bytes)
-  -- ------------------------------------------------------------
+  -- Latched CPU write transaction. 'pend_addr' stores the aligned base address
+  -- for the 32-bit word, while 'pend_be' tracks which byte lanes still need to
+  -- be written into VRAM.
   signal pend      : std_ulogic := '0';
-  signal pend_addr : unsigned(14 downto 0) := (others => '0');  -- aligned base byte address (addr & ~3)
+  signal pend_addr : unsigned(14 downto 0) := (others => '0');
   signal pend_data : std_ulogic_vector(31 downto 0) := (others => '0');
   signal pend_be   : std_ulogic_vector(3 downto 0) := (others => '0');
 
-  signal lane_ptr  : unsigned(1 downto 0) := (others => '0');   -- starting lane to search (0..3)
+  -- Search pointer so enabled byte lanes are serviced deterministically.
+  signal lane_ptr  : unsigned(1 downto 0) := (others => '0');
 
-  -- Extract the byte for lane i (0..3) from 32-bit word
+  -- Extract one byte lane from the 32-bit CPU word.
   function lane_byte(d : std_ulogic_vector(31 downto 0); i : integer)
     return std_ulogic_vector is
   begin
@@ -101,9 +93,8 @@ begin
         lane_ptr  <= (others => '0');
       else
 
-        -- ==========================================================
-        -- VGA read port (registered)
-        -- ==========================================================
+        -- Register the VGA-side byte read. Out-of-range reads return zero so
+        -- future scanout logic has a defined behavior outside the image area.
         raddr := to_integer(vga_addr_i);
         if (raddr >= 0) and (raddr < FB_SIZE) then
           vga_rdata_r <= ram(raddr);
@@ -111,32 +102,33 @@ begin
           vga_rdata_r <= (others => '0');
         end if;
 
-        -- ==========================================================
-        -- Latch a new CPU write request when idle
-        -- ==========================================================
+        -- Accept a new CPU write only when no earlier write is still being
+        -- serialized. That contract is reflected back to the bus slave through
+        -- cpu_ready_o.
         if (pend = '0') and (cpu_we_i = '1') then
           pend <= '1';
 
-          -- Only low 15 bits are meaningful for 19200 bytes of VRAM.
-          -- Align to 32-bit word boundary so byte-enables map to the correct
-          -- byte address for sub-word CPU stores (SB/SH).
+          -- Only the low 15 address bits are meaningful for this framebuffer.
+          -- Align to the containing 32-bit word so lane 0..3 map cleanly onto
+          -- byte writes for SB, SH, or full-word stores.
           pend_addr <= cpu_addr_i(14 downto 0) and to_unsigned (16#7FFC#, 15);
 
           pend_data <= cpu_wdata_i;
           pend_be   <= cpu_be_i;
 
-          -- Start scanning lanes at 0 (deterministic).
+          -- Always start lane scanning at 0 so simulations stay repeatable.
           lane_ptr <= (others => '0');
         end if;
 
-        -- ==========================================================
-        -- If pending, perform ONE byte write per cycle (if any lane enabled)
-        -- ==========================================================
+        -- Service at most one byte lane per cycle. This is the key tradeoff in
+        -- the design: simpler BRAM inference in exchange for multi-byte writes
+        -- taking multiple clocks internally.
         if pend = '1' then
           found := false;
           sel_lane := 0;
 
-          -- Search enabled lanes starting from lane_ptr, wrapping around
+          -- Search from the current pointer and wrap around so all requested
+          -- lanes are eventually serviced even if they were sparse.
           search_start := to_integer(lane_ptr);
           for k in 0 to 3 loop
             idx := (search_start + k) mod 4;
@@ -148,7 +140,8 @@ begin
           end loop;
 
           if found then
-            -- Compute write address: base + lane
+            -- Convert the aligned word base plus the selected lane into the
+            -- final byte address inside the framebuffer.
             base  := to_integer(unsigned(pend_addr));
             waddr := base + sel_lane;
 
@@ -156,20 +149,21 @@ begin
               ram(waddr) <= lane_byte(pend_data, sel_lane);
             end if;
 
-            -- Clear the lane we just wrote (so we eventually finish)
+            -- Clear the lane we just committed so the request eventually drains.
             be_next := pend_be;
             be_next(sel_lane) := '0';
             pend_be <= be_next;
 
-            -- Advance pointer to lane after the one we just serviced
+            -- Continue searching after this lane next cycle.
             lane_ptr <= to_unsigned((sel_lane + 1) mod 4, lane_ptr'length);
 
-            -- If that was the last enabled byte, clear pending next cycle
+            -- Once every enabled lane has been consumed, the write transaction
+            -- is finished and the module becomes ready for the next request.
             if be_next = "0000" then
               pend <= '0';
             end if;
           else
-            -- No enabled lanes => complete transaction
+            -- A transaction with no enabled lanes is treated as a no-op.
             pend <= '0';
           end if;
         end if;
@@ -178,6 +172,8 @@ begin
     end if;
   end process;
 
+  -- The bus slave is allowed to hand us a new write only when no earlier
+  -- multi-lane transaction is still in progress.
   cpu_ready_o <= not pend;
   vga_rdata_o <= vga_rdata_r;
 

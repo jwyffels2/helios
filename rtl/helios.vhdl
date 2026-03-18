@@ -31,25 +31,26 @@ end entity helios;
 
 architecture rtl of helios is
 
-    -- Internal reset for NEORV32 (active-low)
+    -- Convert the board-level active-high pushbutton into the active-low reset
+    -- expected by the NEORV32 core and the framebuffer blocks.
     signal rstn_core   : std_ulogic;
 
-    -- Internal GPIO between NEORV32 and wrapper
+    -- Internal GPIO between NEORV32 and the wrapper pins.
     signal gpio_core_o : std_ulogic_vector(31 downto 0);
     signal gpio_core_i : std_ulogic_vector(31 downto 0);
 
-    -- Internal PWM between NEORV32 and wrapper
+    -- Internal PWM between NEORV32 and the wrapper pins.
     signal pwm_core_o     : STD_ULOGIC_VECTOR(31 downto 0);
 
-    -- Internal TWI Between NEORV32 and wrapper
+    -- Internal TWI between NEORV32 and the wrapper pins.
     signal twi_sda_core_i : STD_ULOGIC;
     signal twi_sda_core_o : STD_ULOGIC;
     signal twi_scl_core_i : STD_ULOGIC;
     signal twi_scl_core_o : STD_ULOGIC;
 
-    -- ------------------------------------------------------------
-    -- NEORV32 XBUS <-> framebuffer (VRAM) signals
-    -- ------------------------------------------------------------
+    -- XBUS signals exported by NEORV32 and consumed by the framebuffer slave.
+    -- The core drives these whenever software accesses the framebuffer MMIO
+    -- window at 0xF0000000.
     signal xbus_adr   : std_ulogic_vector(31 downto 0);
     signal xbus_dat_o : std_ulogic_vector(31 downto 0);
     signal xbus_we    : std_ulogic;
@@ -61,27 +62,28 @@ architecture rtl of helios is
     signal xbus_ack   : std_ulogic;
     signal xbus_err   : std_ulogic := '0';
 
-    -- VRAM write-side interface (from bus slave to VRAM)
+    -- Write-side handshake between the XBUS slave and the VRAM storage block.
     signal vram_cpu_we    : std_ulogic;
     signal vram_cpu_be    : std_ulogic_vector(3 downto 0);
     signal vram_cpu_addr  : unsigned(31 downto 0);
     signal vram_cpu_wdata : std_ulogic_vector(31 downto 0);
     signal vram_ready     : std_ulogic;
 
-    -- VRAM scanout side is not wired yet; keep idle.
+    -- The framebuffer read port is reserved for future VGA scanout. For this
+    -- PR it is intentionally held idle so the write path can be validated on
+    -- its own first.
     signal vga_addr        : unsigned(14 downto 0) := (others => '0');
     signal vga_pixel_debug : std_ulogic_vector(7 downto 0);
 
 begin
 
-  ---------------------------------------------------------------------------
-  -- Reset: convert active-high push button to active-low NEORV32 reset
-  ---------------------------------------------------------------------------
+  -- Convert the board pushbutton polarity once here so the rest of the design
+  -- can treat reset consistently as active-low.
   rstn_core <= not rstn_i;
 
-  ---------------------------------------------------------------------------
-  -- Instantiate NEORV32 SoC top
-  ---------------------------------------------------------------------------
+  -- Main NEORV32 system instance. XBUS is enabled specifically so software can
+  -- reach the framebuffer through a normal MMIO window without changing the
+  -- existing board pinout.
   u_neorv32 : entity neorv32.neorv32_top
     generic map (
       -- Basys3 clock is 100 MHz
@@ -224,13 +226,9 @@ begin
       mext_irq_i   => '0'
     );
 
-  ---------------------------------------------------------------------------
-  -- Framebuffer path (NEORV32 XBUS -> VRAM)
-  --
-  -- This adds an MMIO window at 0xF000_0000 that can be used by software to
-  -- write pixels into a small RGB332 framebuffer stored in BRAM.
-  -- VGA scanout is not wired yet; the VGA read port is held idle.
-  ---------------------------------------------------------------------------
+  -- Framebuffer path. The XBUS slave translates NEORV32 MMIO accesses into the
+  -- VRAM-side write interface, and the VRAM block stores the byte-addressed
+  -- RGB332 pixels in BRAM. VGA scanout stays disconnected in this revision.
   u_vram_xbus : entity work.vram_xbus_slave
     generic map (
       BASE_ADDR => x"F0000000",
@@ -275,8 +273,7 @@ begin
       vga_rdata_o => vga_pixel_debug
     );
 
-
-  -- No external GPIO inputs
+  -- No external GPIO inputs are wired into the system yet.
     gpio_core_i <= (others => '0');
 
     gpio_o           <= gpio_core_o;

@@ -2,23 +2,19 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
--- ============================================================================
--- NEORV32 XBUS slave exposing VRAM as a memory-mapped window.
+-- This block exposes the framebuffer BRAM through the NEORV32 external bus.
+-- The CPU sees a byte-addressed MMIO window starting at 0xF0000000, while the
+-- VRAM write side receives a 32-bit word, byte enables, and a byte offset.
 --
--- Base: 0xF0000000 (typical NEORV32 uncached/external bus region)
--- Size: 0x5000 bytes (covers 19200B framebuffer, rounded up)
+-- The important behavior for teammates to keep in mind is the XBUS handshake.
+-- NEORV32 can pulse STB for one cycle and then leave CYC asserted until ACK is
+-- returned. That means we cannot depend on STB staying high while the VRAM
+-- write path gets ready. Instead, this block latches the request and completes
+-- it later when vram_ready_i says the BRAM-side serializer can accept it.
 --
--- Writes:
---   - xbus_sel_i -> cpu_be
---   - xbus_dat_i -> cpu_wdata
---   - (xbus_adr_i - BASE) -> cpu_addr (byte offset)
---   - ack only when vram_ready_i='1'
---
--- Note on handshake:
---   NEORV32's XBUS may only pulse STB for a new access while keeping CYC high
---   until ACK. Therefore this block latches the request on (CYC & STB) and can
---   complete it later (when vram_ready_i='1') even if STB has already dropped.
--- ============================================================================
+-- Reads are intentionally stubbed out for now. The framebuffer path is
+-- currently write-only from software, so unsupported reads return zero and are
+-- acknowledged immediately.
 entity vram_xbus_slave is
   generic (
     BASE_ADDR : unsigned(31 downto 0) := x"F0000000";
@@ -50,16 +46,21 @@ end entity;
 
 architecture rtl of vram_xbus_slave is
 
+  -- 'hit' is high when the current XBUS address lands in the framebuffer MMIO
+  -- window. 'req_new' captures a new transfer targeting this device. 'ack_r'
+  -- is pulsed for one cycle when we complete the pending request.
   signal hit     : std_ulogic;
   signal req_new : std_ulogic;
   signal ack_r   : std_ulogic := '0';
 
+  -- Small helper so the address decode reads clearly at the call site.
   function in_range(a, base, size : unsigned(31 downto 0)) return boolean is
   begin
     return (a >= base) and (a < (base + size));
   end function;
 
-  -- Latched bus transaction (request can be completed even if STB drops)
+  -- Latched bus transaction. Once captured, the request is held here until the
+  -- VRAM side is ready to consume it.
   signal pend     : std_ulogic := '0';
   signal pend_we  : std_ulogic := '0';
   signal pend_adr : unsigned(31 downto 0) := (others => '0');
@@ -68,10 +69,10 @@ architecture rtl of vram_xbus_slave is
 
 begin
 
-  -- decode window
+  -- Decode whether the live XBUS address targets the framebuffer window.
   hit <= '1' when in_range(unsigned(xbus_adr_i), BASE_ADDR, WIN_SIZE) else '0';
 
-  -- new bus request to this device (may be a pulse)
+  -- Capture the incoming request pulse while it is visible on the bus.
   req_new <= xbus_cyc_i and xbus_stb_i and hit;
 
   process(clk_i)
@@ -91,13 +92,15 @@ begin
         cpu_wdata_o <= (others => '0');
         xbus_dat_o <= (others => '0');
       else
-        -- default outputs
+        -- Default outputs every cycle. If a request completes below, these are
+        -- overwritten for that cycle only.
         ack_r     <= '0';
         cpu_we_o  <= '0';
-        xbus_dat_o <= (others => '0'); -- reads not implemented (yet)
+        xbus_dat_o <= (others => '0');
 
-        -- Latch a new request when idle. If a request arrives while we're busy,
-        -- it will be retried by the bus master (CYC stays high until ACK).
+        -- Latch a new request only when no earlier request is waiting. If one
+        -- arrives while we're busy, the bus master will keep retrying because
+        -- CYC stays high until it sees ACK.
         if (pend = '0') and (req_new = '1') then
           pend     <= '1';
           pend_we  <= xbus_we_i;
@@ -106,25 +109,31 @@ begin
           pend_sel <= xbus_sel_i;
         end if;
 
-        -- Complete the pending access when possible.
+        -- Complete the buffered access when the target side can accept it.
         if pend = '1' then
           if pend_we = '1' then
-            -- write
+            -- Writes wait for the VRAM-side serializer to report ready. This
+            -- keeps the CPU-facing handshake aligned with actual acceptance of
+            -- the request.
             if vram_ready_i = '1' then
               off := pend_adr - BASE_ADDR;
 
-              -- drive VRAM write-side interface (byte addressed)
+              -- The VRAM module expects a byte offset within the framebuffer
+              -- window plus the original word data and byte enables.
               cpu_addr_o  <= off;
               cpu_wdata_o <= pend_dat;
               cpu_be_o    <= pend_sel;
               cpu_we_o    <= '1';
 
-              -- acknowledge this transfer
+              -- Acknowledge only after the VRAM side has actually accepted the
+              -- transfer, so software never observes a dropped write.
               ack_r <= '1';
               pend  <= '0';
             end if;
           else
-            -- read not supported: ack immediately with 0s (safe default)
+            -- Reads are not part of the current framebuffer contract. Return
+            -- zero so software gets a deterministic result instead of a bus
+            -- hang while the read path is still unimplemented.
             ack_r     <= '1';
             xbus_dat_o <= (others => '0');
             pend      <= '0';
