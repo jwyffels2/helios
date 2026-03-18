@@ -70,6 +70,15 @@ try {
          (Join-Path $tbDir "tb_vram_xbus_slave.vhd")
       )
 
+   Run-Testbench `
+      -Name "tb_vga_scanout_rgb332" `
+      -Sources @(
+         (Join-Path $rtlDir "vga_640x480_timing.vhd"),
+         (Join-Path $rtlDir "vga_scanout_rgb332.vhd"),
+         (Join-Path $rtlDir "vram_rgb332_dp.vhd"),
+         (Join-Path $tbDir "tb_vga_scanout_rgb332.vhd")
+      )
+
    Write-Host "All XSIM testbenches passed."
 }
 finally {

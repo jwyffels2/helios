@@ -5,14 +5,8 @@ use ieee.numeric_std.all;
 library neorv32;
 use neorv32.neorv32_package.all;
 
--- Wrapper that matches your XDC:
---   clk_i        : 100 MHz clock (W5)
---   rstn_i       : reset button BTNC (active HIGH on board)
---   uart0_rxd_i  : USB-UART RX (B18)
---   uart0_txd_o  : USB-UART TX (A18)
---   gpio_o[7:0]  : LEDs (LD0..LD7)
---
--- Plus: gpio_o(7) is forced to clk_i so you get the clock on a GPIO/LED.
+-- Wrapper that matches the Basys3 XDC.
+-- VGA outputs are sourced from the framebuffer scanout path.
 
 entity helios is
   port (
@@ -25,7 +19,12 @@ entity helios is
     twi_sda_i   : in  STD_ULOGIC;
     twi_sda_o   : out STD_ULOGIC;
     twi_scl_i   : in  STD_ULOGIC;
-    twi_scl_o   : out STD_ULOGIC
+    twi_scl_o   : out STD_ULOGIC;
+    vga_hsync_o : out std_ulogic;
+    vga_vsync_o : out std_ulogic;
+    vga_r_o     : out std_ulogic_vector(3 downto 0);
+    vga_g_o     : out std_ulogic_vector(3 downto 0);
+    vga_b_o     : out std_ulogic_vector(3 downto 0)
   );
 end entity helios;
 
@@ -69,11 +68,9 @@ architecture rtl of helios is
     signal vram_cpu_wdata : std_ulogic_vector(31 downto 0);
     signal vram_ready     : std_ulogic;
 
-    -- The framebuffer read port is reserved for future VGA scanout. For this
-    -- PR it is intentionally held idle so the write path can be validated on
-    -- its own first.
-    signal vga_addr        : unsigned(14 downto 0) := (others => '0');
-    signal vga_pixel_debug : std_ulogic_vector(7 downto 0);
+    -- VGA scanout reads pixels from the framebuffer over the second VRAM port.
+    signal vga_addr  : unsigned(14 downto 0);
+    signal vga_pixel : std_ulogic_vector(7 downto 0);
 
 begin
 
@@ -228,7 +225,7 @@ begin
 
   -- Framebuffer path. The XBUS slave translates NEORV32 MMIO accesses into the
   -- VRAM-side write interface, and the VRAM block stores the byte-addressed
-  -- RGB332 pixels in BRAM. VGA scanout stays disconnected in this revision.
+  -- RGB332 pixels in BRAM for both software writes and VGA scanout reads.
   u_vram_xbus : entity work.vram_xbus_slave
     generic map (
       BASE_ADDR => x"F0000000",
@@ -270,7 +267,25 @@ begin
       cpu_ready_o => vram_ready,
 
       vga_addr_i  => vga_addr,
-      vga_rdata_o => vga_pixel_debug
+      vga_rdata_o => vga_pixel
+    );
+
+  u_vga_scanout : entity work.vga_scanout_rgb332
+    generic map (
+      FB_WIDTH   => 160,
+      FB_HEIGHT  => 120,
+      PIX_CE_DIV => 4
+    )
+    port map (
+      clk_i        => clk_i,
+      rstn_i       => rstn_core,
+      vram_addr_o  => vga_addr,
+      vram_rdata_i => vga_pixel,
+      vga_hsync_o  => vga_hsync_o,
+      vga_vsync_o  => vga_vsync_o,
+      vga_r_o      => vga_r_o,
+      vga_g_o      => vga_g_o,
+      vga_b_o      => vga_b_o
     );
 
   -- No external GPIO inputs are wired into the system yet.
