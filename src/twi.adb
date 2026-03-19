@@ -223,8 +223,8 @@ package body TWI is
     Data  : Integer := Value;
     Ack   : Integer;
     begin
-        Ada.Text_IO.Put_Line ("Start Writing");
         TWI_Generate_Start;
+
         Ack := TWI_Transfer (Write_Address, False);
         if Ack /= 0 then
             TWI_Generate_Stop;
@@ -232,7 +232,6 @@ package body TWI is
         end if;
 
         Ack := TWI_Transfer (RegHi, False);
-
         if Ack /= 0 then
             TWI_Generate_Stop;
             return;
@@ -247,8 +246,6 @@ package body TWI is
         Ack := TWI_Transfer (Data, False);
 
         TWI_Generate_Stop;
-        Ada.Text_IO.Put_Line ("End Writing");
-
 
     end I2C_Write;
 
@@ -264,8 +261,8 @@ package body TWI is
     Ack   : Integer;
 
     begin
-        Ada.Text_IO.Put_Line ("Start Writing");
         TWI_Generate_Start;
+
         Ack := TWI_Transfer (Write_Address, False);
         if Ack /= 0 then
             TWI_Generate_Stop;
@@ -273,7 +270,6 @@ package body TWI is
         end if;
 
         Ack := TWI_Transfer (RegHi, False);
-
         if Ack /= 0 then
             TWI_Generate_Stop;
             return -1;
@@ -284,32 +280,31 @@ package body TWI is
             TWI_Generate_Stop;
             return -1;
         end if;
-        Ada.Text_IO.Put_Line ("Start Again!");
 
         TWI_Generate_Start;
-        if Ack /= 0 then
-            TWI_Generate_Stop;
-            return -1;
-        end if;
-        Ada.Text_IO.Put_Line ("Start Reading!");
 
-        Ack := TWI_Transfer (Read_Address, True);
         if Ack /= 0 then
             TWI_Generate_Stop;
             return -1;
         end if;
 
-        Ack := TWI_Transfer (Data, True); -- True => NACK after receive (last byte)
+        Ack := TWI_Transfer (Read_Address, False);
         if Ack /= 0 then
             TWI_Generate_Stop;
             return -1;
         end if;
-        Ada.Text_IO.Put_Line ("Read Data: " & Data'Image);
+
+        Ack := TWI_Transfer (Data, True);
+        if Ack /= 0 then
+            TWI_Generate_Stop;
+            return -1;
+        end if;
 
         TWI_Generate_Stop;
+
+        TWI_Generate_Start;
+
         return Data;
-
-
     end I2C_Read;
 
     function I2C_Ping (Device_Address : I2C_Addr7) return Boolean
