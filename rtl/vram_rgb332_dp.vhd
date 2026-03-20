@@ -11,9 +11,8 @@ use ieee.numeric_std.all;
 -- write per clock. That keeps synthesis predictable and makes the ready/ack
 -- behavior easy to reason about in simulation.
 --
--- The VGA-side read port already exists so scanout can be added later. For the
--- current bring-up phase, the top level holds that side idle and uses this
--- module only as VRAM storage for software writes.
+-- The second port feeds the live VGA scanout block, so the framebuffer can be
+-- updated by software while the display path reads pixels out continuously.
 entity vram_rgb332_dp is
   generic (
     FB_SIZE : integer := 19200
@@ -94,7 +93,7 @@ begin
       else
 
         -- Register the VGA-side byte read. Out-of-range reads return zero so
-        -- future scanout logic has a defined behavior outside the image area.
+        -- scanout sees a defined black pixel outside the image area.
         raddr := to_integer(vga_addr_i);
         if (raddr >= 0) and (raddr < FB_SIZE) then
           vga_rdata_r <= ram(raddr);

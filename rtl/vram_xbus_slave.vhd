@@ -12,9 +12,8 @@ use ieee.numeric_std.all;
 -- write path gets ready. Instead, this block latches the request and completes
 -- it later when vram_ready_i says the BRAM-side serializer can accept it.
 --
--- Reads are intentionally stubbed out for now. The framebuffer path is
--- currently write-only from software, so unsupported reads return zero and are
--- acknowledged immediately.
+-- VGA scanout is active, but software access is still write-only for now.
+-- Read transactions are acknowledged and return zero.
 entity vram_xbus_slave is
   generic (
     BASE_ADDR : unsigned(31 downto 0) := x"F0000000";
@@ -131,9 +130,9 @@ begin
               pend  <= '0';
             end if;
           else
-            -- Reads are not part of the current framebuffer contract. Return
-            -- zero so software gets a deterministic result instead of a bus
-            -- hang while the read path is still unimplemented.
+            -- The display path reads VRAM through the dedicated VGA port.
+            -- Software reads are still outside the current MMIO contract, so
+            -- return zero instead of stalling the bus.
             ack_r     <= '1';
             xbus_dat_o <= (others => '0');
             pend      <= '0';

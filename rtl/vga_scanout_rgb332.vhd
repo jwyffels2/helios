@@ -2,6 +2,9 @@ library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
+-- Read RGB332 framebuffer bytes from VRAM and present them as a 640x480 VGA
+-- stream. Each 160x120 framebuffer pixel is expanded 4x horizontally and 4x
+-- vertically, and the color channels are widened from RGB332 to RGB444.
 entity vga_scanout_rgb332 is
   generic (
     FB_WIDTH   : positive := 160;
