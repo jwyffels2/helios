@@ -29,7 +29,7 @@ set_property PACKAGE_PIN U15 [get_ports {gpio_o[5]}]
 set_property PACKAGE_PIN U14 [get_ports {gpio_o[6]}]
 #set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
 
-# RESET PIN
+# Extra GPIO output currently routed to the reset pin header location.
 set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
 
 
@@ -40,21 +40,18 @@ set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 set_property PACKAGE_PIN A15 [get_ports pwm_o[0]]
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
 
-#========================TWI==========================
-# TWI_SDA_I and TWI_SDA_O should be the same pin
+# TWI input and output are intentionally mapped to the same package pins.
 set_property PACKAGE_PIN P17 [get_ports twi_sda_i]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_i]
 
 set_property PACKAGE_PIN P17 [get_ports twi_sda_o]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_o]
 
-# TWI_SCL_I and TWI_SCL_O should be the same pin
 set_property PACKAGE_PIN N17 [get_ports twi_scl_i]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_i]
 
 set_property PACKAGE_PIN N17 [get_ports twi_scl_o]
 set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_o]
-#=====================END OF TWI======================
 
 ## VGA output
 set_property PACKAGE_PIN P19 [get_ports vga_hsync_o]
