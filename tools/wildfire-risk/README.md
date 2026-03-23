@@ -140,6 +140,14 @@ node tools/wildfire-risk/train_true_classifier.js
 
 This writes `tools/wildfire-risk/output/true_classifier_model.json`.
 
+The training step now fits a Platt-scaling calibration layer on the validation split, so live inference reports:
+
+- `rawProbability`: the uncalibrated classifier score
+- `wildfireProbability`: the calibrated probability estimate
+
+The saved model also includes raw vs calibrated validation/test metrics, including Brier score.
+If the validation split is too small or only contains one class, the calibration step falls back to identity scaling and the output will report that status.
+
 ### Run live inference with the true classifier
 
 ```powershell
@@ -166,6 +174,33 @@ The true classifier currently uses:
 - seasonal terms from date
 
 For live inference, the weather values come from Open-Meteo and the static/context fields (`vegetationType`, `vegetation`, `pdsi`) are pulled from the nearest seasonal match in the local FIRMS join CSV.
+
+### Batch-score multiple coordinate requests
+
+Use the batch scorer to rank multiple coordinates from a CSV:
+
+```powershell
+node tools/wildfire-risk/batch_live_true_classifier.js --input tools/wildfire-risk/batch_example.csv --output-csv tools/wildfire-risk/output/batch_scores.csv
+```
+
+The input CSV should include:
+
+- `id`
+- `lat`
+- `long`
+- optional `date`
+
+Optional JSON output:
+
+```powershell
+node tools/wildfire-risk/batch_live_true_classifier.js --input tools/wildfire-risk/batch_example.csv --output-json tools/wildfire-risk/output/batch_scores.json
+```
+
+For offline testing, you can replay a saved Open-Meteo response for every row:
+
+```powershell
+node tools/wildfire-risk/batch_live_true_classifier.js --input tools/wildfire-risk/batch_example.csv --source-file tools/wildfire-risk/sample_open_meteo_response.json
+```
 
 ### Evaluation split
 

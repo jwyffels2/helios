@@ -3,16 +3,9 @@
 const fs = require("fs");
 const path = require("path");
 const {
-  imputeFeatureMap,
   loadJson,
-  normalizeVector,
-  predictProbability,
   saveJson,
 } = require("./common");
-const {
-  TRUE_FEATURE_NAMES,
-  buildTrueClassifierFeatureMap,
-} = require("./true_classifier_common");
 const {
   fetchOpenMeteoForecast,
   mapForecastPayloadToTrueClassifierInput,
@@ -22,6 +15,9 @@ const {
   buildContextIndex,
   lookupNearestContext,
 } = require("./context_lookup");
+const {
+  scoreTrueClassifierInput,
+} = require("./true_classifier_runtime");
 
 function parseArguments(argv) {
   const args = {
@@ -89,14 +85,12 @@ async function main() {
     args.date
   );
   Object.assign(apiMappedInput, lookupNearestContext(contextIndex, apiMappedInput));
-  const rawFeatureMap = buildTrueClassifierFeatureMap(apiMappedInput, new Date(apiMappedInput.date));
-  const { completedFeatureMap, missingFeatures } = imputeFeatureMap(
-    rawFeatureMap,
-    model.imputationMeans,
-    TRUE_FEATURE_NAMES
-  );
-  const vector = normalizeVector(completedFeatureMap, model.normalization, TRUE_FEATURE_NAMES);
-  const probability = predictProbability(vector, model);
+  const {
+    completedFeatureMap,
+    missingFeatures,
+    rawProbability,
+    calibratedProbability,
+  } = scoreTrueClassifierInput(apiMappedInput, model, new Date(apiMappedInput.date));
 
   const result = {
     source: args.sourceFile
@@ -114,7 +108,9 @@ async function main() {
     },
     contextSource: contextIndex.csvPath,
     apiMappedInput,
-    wildfireProbability: probability,
+    calibration: model.calibration ?? null,
+    rawProbability,
+    wildfireProbability: calibratedProbability,
     missingFeaturesImputed: missingFeatures,
     featuresUsed: completedFeatureMap,
     targetDescription: model.targetDescription,

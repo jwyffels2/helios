@@ -4,14 +4,18 @@ const path = require("path");
 const {
   applyImputation,
   areaUnderCurve,
+  brierScore,
+  calibrateLogit,
   computeImputationStats,
   computeNormalizationStats,
+  fitPlattScaling,
   confusionMetrics,
   loadJson,
   logLoss,
   normalizeVector,
-  predictProbability,
+  predictLogit,
   trainLogisticRegression,
+  saveJson,
 } = require("./common");
 const {
   TRUE_FEATURE_NAMES,
@@ -132,7 +136,21 @@ function splitTimeAndGeography(records, options) {
 function scoreRecords(records, model) {
   return records.map((record) => ({
     target: record.target,
-    probability: predictProbability(record.vector, model),
+    logit: predictLogit(record.vector, model),
+  }));
+}
+
+function applyCalibration(scoredRecords, calibration) {
+  return scoredRecords.map((record) => ({
+    target: record.target,
+    probability: calibrateLogit(record.logit, calibration),
+  }));
+}
+
+function logitsToRawProbabilities(scoredRecords) {
+  return scoredRecords.map((record) => ({
+    target: record.target,
+    probability: calibrateLogit(record.logit, null),
   }));
 }
 
@@ -141,6 +159,7 @@ function summarizeMetrics(scoredRecords) {
     ...confusionMetrics(scoredRecords, 0.5),
     auc: areaUnderCurve(scoredRecords),
     logLoss: logLoss(scoredRecords),
+    brierScore: brierScore(scoredRecords),
   };
 }
 
@@ -189,12 +208,17 @@ function main() {
     l2Penalty: args.l2Penalty,
   });
 
-  const validationMetrics = summarizeMetrics(scoreRecords(validation, model));
-  const testMetrics = summarizeMetrics(scoreRecords(test, model));
+  const validationLogits = scoreRecords(validation, model);
+  const testLogits = scoreRecords(test, model);
+  const calibration = fitPlattScaling(validationLogits);
+  const validationRawMetrics = summarizeMetrics(logitsToRawProbabilities(validationLogits));
+  const validationCalibratedMetrics = summarizeMetrics(applyCalibration(validationLogits, calibration));
+  const testRawMetrics = summarizeMetrics(logitsToRawProbabilities(testLogits));
+  const testCalibratedMetrics = summarizeMetrics(applyCalibration(testLogits, calibration));
 
   const modelDocument = {
     modelType: "logistic_regression_binary_fire_classifier",
-    targetDescription: "estimated probability that the sampled coordinate/time belongs to a wildfire-positive event rather than a sampled non-fire background point",
+    targetDescription: "calibrated estimate that the sampled coordinate/time belongs to a wildfire-positive event rather than a sampled non-fire background point",
     limitation: "This is a true binary classifier, but the negative class is generated from sampled background coordinates and historical weather, not hand-labeled field truth.",
     trainedAt: new Date().toISOString(),
     trainingData: {
@@ -221,26 +245,36 @@ function main() {
     normalization: normalizationStats,
     weights: model.weights,
     bias: model.bias,
+    calibration,
     metrics: {
-      validation: validationMetrics,
-      test: testMetrics,
+      validation: {
+        raw: validationRawMetrics,
+        calibrated: validationCalibratedMetrics,
+      },
+      test: {
+        raw: testRawMetrics,
+        calibrated: testCalibratedMetrics,
+      },
     },
   };
 
-  require("./common").saveJson(args.output, modelDocument);
+  saveJson(args.output, modelDocument);
 
   console.log(`Saved model to ${path.resolve(args.output)}`);
   console.log(`Rows: train=${training.length} validation=${validation.length} test=${test.length}`);
-  console.log(`Validation accuracy: ${formatMetric(validationMetrics.accuracy)}`);
-  console.log(`Validation precision: ${formatMetric(validationMetrics.precision)}`);
-  console.log(`Validation recall: ${formatMetric(validationMetrics.recall)}`);
-  console.log(`Validation AUC: ${formatMetric(validationMetrics.auc)}`);
-  console.log(`Validation log loss: ${formatMetric(validationMetrics.logLoss)}`);
-  console.log(`Test accuracy: ${formatMetric(testMetrics.accuracy)}`);
-  console.log(`Test precision: ${formatMetric(testMetrics.precision)}`);
-  console.log(`Test recall: ${formatMetric(testMetrics.recall)}`);
-  console.log(`Test AUC: ${formatMetric(testMetrics.auc)}`);
-  console.log(`Test log loss: ${formatMetric(testMetrics.logLoss)}`);
+  console.log(`Calibration: ${calibration.type} (${calibration.status})`);
+  console.log(`Validation raw AUC: ${formatMetric(validationRawMetrics.auc)}`);
+  console.log(`Validation raw log loss: ${formatMetric(validationRawMetrics.logLoss)}`);
+  console.log(`Validation raw Brier: ${formatMetric(validationRawMetrics.brierScore)}`);
+  console.log(`Validation calibrated AUC: ${formatMetric(validationCalibratedMetrics.auc)}`);
+  console.log(`Validation calibrated log loss: ${formatMetric(validationCalibratedMetrics.logLoss)}`);
+  console.log(`Validation calibrated Brier: ${formatMetric(validationCalibratedMetrics.brierScore)}`);
+  console.log(`Test raw AUC: ${formatMetric(testRawMetrics.auc)}`);
+  console.log(`Test raw log loss: ${formatMetric(testRawMetrics.logLoss)}`);
+  console.log(`Test raw Brier: ${formatMetric(testRawMetrics.brierScore)}`);
+  console.log(`Test calibrated AUC: ${formatMetric(testCalibratedMetrics.auc)}`);
+  console.log(`Test calibrated log loss: ${formatMetric(testCalibratedMetrics.logLoss)}`);
+  console.log(`Test calibrated Brier: ${formatMetric(testCalibratedMetrics.brierScore)}`);
 }
 
 main();

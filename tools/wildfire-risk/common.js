@@ -279,8 +279,65 @@ function trainLogisticRegression(records, options = {}) {
   return { weights, bias };
 }
 
+function predictLogit(vector, model) {
+  return dotProduct(model.weights, vector) + model.bias;
+}
+
 function predictProbability(vector, model) {
-  return sigmoid(dotProduct(model.weights, vector) + model.bias);
+  return sigmoid(predictLogit(vector, model));
+}
+
+function fitPlattScaling(scoredRecords, options = {}) {
+  const positives = scoredRecords.filter((record) => record.target === 1).length;
+  const negatives = scoredRecords.length - positives;
+
+  if (scoredRecords.length === 0 || positives === 0 || negatives === 0) {
+    return {
+      type: "identity",
+      scale: 1,
+      bias: 0,
+      fittedOnCount: scoredRecords.length,
+      status: "insufficient_class_balance",
+    };
+  }
+
+  const epochs = options.epochs ?? 1200;
+  const learningRate = options.learningRate ?? 0.01;
+  const l2Penalty = options.l2Penalty ?? 0.001;
+  let scale = 1;
+  let bias = 0;
+
+  for (let epoch = 0; epoch < epochs; epoch += 1) {
+    let scaleGradient = 0;
+    let biasGradient = 0;
+
+    for (const record of scoredRecords) {
+      const probability = sigmoid((scale * record.logit) + bias);
+      const error = probability - record.target;
+      scaleGradient += error * record.logit;
+      biasGradient += error;
+    }
+
+    const normalization = 1 / scoredRecords.length;
+    scale -= learningRate * ((scaleGradient * normalization) + (l2Penalty * scale));
+    bias -= learningRate * ((biasGradient * normalization) + (l2Penalty * bias));
+  }
+
+  return {
+    type: "platt",
+    scale,
+    bias,
+    fittedOnCount: scoredRecords.length,
+    status: "fit_on_validation",
+  };
+}
+
+function calibrateLogit(logit, calibration) {
+  if (!calibration || calibration.type === "identity") {
+    return sigmoid(logit);
+  }
+
+  return sigmoid((calibration.scale * logit) + calibration.bias);
 }
 
 function confusionMetrics(scoredRecords, threshold = 0.5) {
@@ -328,6 +385,19 @@ function logLoss(scoredRecords) {
   return scoredRecords.length > 0 ? total / scoredRecords.length : 0;
 }
 
+function brierScore(scoredRecords) {
+  if (scoredRecords.length === 0) {
+    return 0;
+  }
+
+  const total = scoredRecords.reduce((sum, record) => {
+    const error = record.probability - record.target;
+    return sum + (error ** 2);
+  }, 0);
+
+  return total / scoredRecords.length;
+}
+
 function areaUnderCurve(scoredRecords) {
   const sorted = [...scoredRecords].sort((left, right) => right.probability - left.probability);
   const positives = sorted.filter((record) => record.target === 1).length;
@@ -367,6 +437,28 @@ function saveJson(filePath, value) {
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+function writeCsv(filePath, headers, rows) {
+  ensureDirectoryExists(path.dirname(filePath));
+  const escapeCell = (value) => {
+    if (value === undefined || value === null) {
+      return "";
+    }
+
+    const text = String(value);
+    if (text.includes("\"") || text.includes(",") || text.includes("\n") || text.includes("\r")) {
+      return `"${text.replaceAll("\"", "\"\"")}"`;
+    }
+    return text;
+  };
+
+  const lines = [headers.map(escapeCell).join(",")];
+  rows.forEach((row) => {
+    lines.push(headers.map((header) => escapeCell(row[header])).join(","));
+  });
+
+  fs.writeFileSync(filePath, `${lines.join("\n")}\n`, "utf8");
+}
+
 function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
 }
@@ -376,12 +468,15 @@ module.exports = {
   FEATURE_SPECS,
   areaUnderCurve,
   applyImputation,
+  brierScore,
   buildFeatureMap,
+  calibrateLogit,
   computeImputationStats,
   computeNormalizationStats,
   confidenceToTarget,
   confusionMetrics,
   ensureDirectoryExists,
+  fitPlattScaling,
   imputeFeatureMap,
   loadCsv,
   loadJson,
@@ -389,8 +484,10 @@ module.exports = {
   normalizeVector,
   parseDateValue,
   parseNumber,
+  predictLogit,
   predictProbability,
   saveJson,
   splitTemporal,
   trainLogisticRegression,
+  writeCsv,
 };
