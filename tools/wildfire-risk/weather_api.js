@@ -61,9 +61,13 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime) {
     "hourly",
     [
       "temperature_2m",
+      "relative_humidity_2m",
+      "dew_point_2m",
       "precipitation",
       "wind_speed_10m",
       "wind_direction_10m",
+      "surface_pressure",
+      "cloud_cover",
       "soil_temperature_0_to_7cm",
       "soil_moisture_0_to_7cm",
     ].join(",")
@@ -87,11 +91,15 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime) {
     long: longitude,
     date: targetDate.toISOString(),
     temperatureSurface: hourlyIndex >= 0 ? hourly.temperature_2m?.[hourlyIndex] ?? null : null,
+    relativeHumiditySurface: hourlyIndex >= 0 ? hourly.relative_humidity_2m?.[hourlyIndex] ?? null : null,
+    dewPointSurface: hourlyIndex >= 0 ? hourly.dew_point_2m?.[hourlyIndex] ?? null : null,
     precipitation: hourlyIndex >= 0 ? hourly.precipitation?.[hourlyIndex] ?? null : null,
     tmax: firstValue(payload.daily?.temperature_2m_max),
     tmin: firstValue(payload.daily?.temperature_2m_min),
     windU,
     windV,
+    surfacePressure: hourlyIndex >= 0 ? hourly.surface_pressure?.[hourlyIndex] ?? null : null,
+    cloudCover: hourlyIndex >= 0 ? hourly.cloud_cover?.[hourlyIndex] ?? null : null,
     soilTemperatureSurface: hourlyIndex >= 0 ? hourly.soil_temperature_0_to_7cm?.[hourlyIndex] ?? null : null,
     soilMoistureSurface: hourlyIndex >= 0 ? hourly.soil_moisture_0_to_7cm?.[hourlyIndex] ?? null : null,
   };
@@ -108,7 +116,18 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
   url.searchParams.set("wind_speed_unit", "ms");
   url.searchParams.set(
     "current",
-    "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,soil_temperature_0_to_7cm,soil_moisture_0_to_7cm"
+    [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "dew_point_2m",
+      "precipitation",
+      "wind_speed_10m",
+      "wind_direction_10m",
+      "surface_pressure",
+      "cloud_cover",
+      "soil_temperature_0_to_7cm",
+      "soil_moisture_0_to_7cm",
+    ].join(",")
   );
   url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
 
@@ -133,11 +152,15 @@ function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, d
     long: longitude,
     date: dateOverride ?? (current.time ? `${current.time}Z` : null) ?? new Date().toISOString(),
     temperatureSurface: current.temperature_2m ?? null,
+    relativeHumiditySurface: current.relative_humidity_2m ?? null,
+    dewPointSurface: current.dew_point_2m ?? null,
     precipitation: current.precipitation ?? null,
     tmax: firstValue(daily.temperature_2m_max),
     tmin: firstValue(daily.temperature_2m_min),
     windU,
     windV,
+    surfacePressure: current.surface_pressure ?? null,
+    cloudCover: current.cloud_cover ?? null,
     soilTemperatureSurface: current.soil_temperature_0_to_7cm ?? null,
     soilMoistureSurface: current.soil_moisture_0_to_7cm ?? null,
   };

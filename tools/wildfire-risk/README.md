@@ -150,9 +150,13 @@ The true classifier currently uses:
 
 - latitude / longitude
 - temperature
+- relative humidity
+- dew point
 - precipitation
 - max and min daily temperature
 - wind components and wind speed
+- surface pressure
+- cloud cover
 - shallow soil temperature
 - shallow soil moisture
 - seasonal terms from date
