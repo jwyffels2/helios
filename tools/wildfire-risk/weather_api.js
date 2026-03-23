@@ -1,5 +1,12 @@
 "use strict";
 
+const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
+
+const DEFAULT_CACHE_DIR = path.join(__dirname, "output", "cache", "open-meteo");
+const FORECAST_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
+
 function toIsoHourString(value) {
   if (!value) {
     return null;
@@ -45,6 +52,60 @@ function nearestHourlyIndex(times, targetDate) {
   return bestIndex;
 }
 
+function ensureDirectoryExists(directoryPath) {
+  fs.mkdirSync(directoryPath, { recursive: true });
+}
+
+function buildCachePath(cacheKey, url) {
+  const hash = crypto.createHash("sha1").update(url.toString()).digest("hex");
+  return path.join(DEFAULT_CACHE_DIR, `${cacheKey}-${hash}.json`);
+}
+
+function readCache(cachePath, maxAgeMs = Number.POSITIVE_INFINITY) {
+  if (!fs.existsSync(cachePath)) {
+    return null;
+  }
+
+  try {
+    const cacheDocument = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    const cachedAt = new Date(cacheDocument.cachedAt).getTime();
+    const ageMs = Date.now() - cachedAt;
+    if (!Number.isFinite(cachedAt) || ageMs > maxAgeMs) {
+      return null;
+    }
+
+    return cacheDocument.payload ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(cachePath, url, payload) {
+  ensureDirectoryExists(path.dirname(cachePath));
+  fs.writeFileSync(cachePath, `${JSON.stringify({
+    cachedAt: new Date().toISOString(),
+    url: url.toString(),
+    payload,
+  }, null, 2)}\n`, "utf8");
+}
+
+async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFINITY) {
+  const cachePath = buildCachePath(cacheKey, url);
+  const cachedPayload = readCache(cachePath, maxAgeMs);
+  if (cachedPayload) {
+    return cachedPayload;
+  }
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Open-Meteo request failed with status ${response.status}`);
+  }
+
+  const payload = await response.json();
+  writeCache(cachePath, url, payload);
+  return payload;
+}
+
 async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime) {
   const targetDate = new Date(isoDateTime);
   const dateString = targetDate.toISOString().slice(0, 10);
@@ -74,12 +135,7 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime) {
   );
   url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Open-Meteo archive request failed with status ${response.status}`);
-  }
-
-  const payload = await response.json();
+  const payload = await fetchJsonWithCache(url, "archive");
   const hourly = payload.hourly ?? {};
   const hourlyIndex = nearestHourlyIndex(hourly.time, targetDate);
   const windSpeed = hourlyIndex >= 0 ? hourly.wind_speed_10m?.[hourlyIndex] : null;
@@ -132,12 +188,7 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
   );
   url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Open-Meteo forecast request failed with status ${response.status}`);
-  }
-
-  return response.json();
+  return fetchJsonWithCache(url, "forecast", FORECAST_CACHE_MAX_AGE_MS);
 }
 
 function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, dateOverride) {
@@ -169,6 +220,7 @@ function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, d
 }
 
 module.exports = {
+  DEFAULT_CACHE_DIR,
   fetchOpenMeteoArchive,
   fetchOpenMeteoForecast,
   mapForecastPayloadToTrueClassifierInput,

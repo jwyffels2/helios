@@ -175,6 +175,15 @@ The true classifier currently uses:
 
 For live inference, the weather values come from Open-Meteo and the static/context fields (`vegetationType`, `vegetation`, `pdsi`) are pulled from the nearest seasonal match in the local FIRMS join CSV.
 
+### Local API cache
+
+Open-Meteo archive and forecast responses are cached under `tools/wildfire-risk/output/cache/open-meteo`.
+
+- archive requests are cached indefinitely because they are historical
+- forecast requests are cached for one hour
+
+This keeps repeated dataset generation and repeated live scoring from re-hitting the API on every run.
+
 ### Batch-score multiple coordinate requests
 
 Use the batch scorer to rank multiple coordinates from a CSV:
@@ -211,3 +220,75 @@ The true classifier no longer uses a simple time-only split.
 - `test`: later samples from held-out geographic cells
 
 That makes the final test set harder and reduces the chance that the model is just memorizing local patterns from nearby coordinates.
+
+## True-classifier operating notes
+
+### Assumptions
+
+- FIRMS detections are treated as positive wildfire examples.
+- Negative examples are sampled background points that are separated from known detections in space and time.
+- Open-Meteo historical and forecast data are acceptable environmental proxies for the first version of the model.
+- The nearest seasonal context match from the local FIRMS join is an acceptable proxy for vegetation and drought context during live scoring.
+
+### Limits
+
+- The negative class is sampled, not hand-labeled field truth.
+- Probability calibration only works when the validation split contains both classes; otherwise the model falls back to identity calibration.
+- Live scoring quality is limited by the freshness and spatial resolution of the weather API and by the nearest-neighbor context lookup.
+- The fixture verifier checks inference wiring and output shape, not scientific correctness.
+
+### Exact commands
+
+Build a small smoke-test dataset:
+
+```powershell
+node tools/wildfire-risk/build_true_classifier_dataset.js --positives 5 --negatives 5 --output tools/wildfire-risk/output/true_classifier_dataset_smoke.json
+```
+
+Train a smoke-test model:
+
+```powershell
+node tools/wildfire-risk/train_true_classifier.js --input tools/wildfire-risk/output/true_classifier_dataset_smoke.json --output tools/wildfire-risk/output/true_classifier_model_smoke.json
+```
+
+Run deterministic fixture verification:
+
+```powershell
+node tools/wildfire-risk/verify_true_classifier_fixture.js --model tools/wildfire-risk/output/true_classifier_model_smoke.json
+```
+
+Run single-coordinate offline inference:
+
+```powershell
+node tools/wildfire-risk/live_true_classifier.js --lat 48.6411 --long -118.3751 --model tools/wildfire-risk/output/true_classifier_model_smoke.json --source-file tools/wildfire-risk/sample_open_meteo_response.json
+```
+
+Run batch offline inference:
+
+```powershell
+node tools/wildfire-risk/batch_live_true_classifier.js --input tools/wildfire-risk/batch_example.csv --model tools/wildfire-risk/output/true_classifier_model_smoke.json --source-file tools/wildfire-risk/sample_open_meteo_response.json --output-csv tools/wildfire-risk/output/batch_scores_smoke.csv
+```
+
+### Expected outputs
+
+- Dataset build prints the saved dataset path plus positive and negative counts.
+- Training prints train/validation/test row counts, calibration status, and raw vs calibrated metrics.
+- Fixture verification prints one JSON object with:
+  - `rawProbability`
+  - `wildfireProbability`
+  - `missingFeaturesImputed`
+  - `featuresUsed`
+- Live inference prints one JSON object with:
+  - `coordinates`
+  - `apiMappedInput`
+  - `calibration`
+  - `rawProbability`
+  - `wildfireProbability`
+- Batch inference prints a ranked top list to the console and writes a CSV with:
+  - `id`
+  - `lat`
+  - `long`
+  - `date`
+  - `rawProbability`
+  - `wildfireProbability`
+  - `missingFeatureCount`
