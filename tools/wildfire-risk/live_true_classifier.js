@@ -17,6 +17,11 @@ const {
   fetchOpenMeteoForecast,
   mapForecastPayloadToTrueClassifierInput,
 } = require("./weather_api");
+const {
+  DEFAULT_CONTEXT_CSV,
+  buildContextIndex,
+  lookupNearestContext,
+} = require("./context_lookup");
 
 function parseArguments(argv) {
   const args = {
@@ -26,6 +31,7 @@ function parseArguments(argv) {
     longitude: null,
     date: null,
     sourceFile: null,
+    contextCsv: DEFAULT_CONTEXT_CSV,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,6 +54,9 @@ function parseArguments(argv) {
       index += 1;
     } else if (token === "--source-file") {
       args.sourceFile = argv[index + 1];
+      index += 1;
+    } else if (token === "--context-csv") {
+      args.contextCsv = argv[index + 1];
       index += 1;
     }
   }
@@ -72,12 +81,14 @@ async function main() {
   const args = parseArguments(process.argv.slice(2));
   const model = loadJson(args.model);
   const weatherPayload = await loadWeatherPayload(args);
+  const contextIndex = buildContextIndex(args.contextCsv);
   const apiMappedInput = mapForecastPayloadToTrueClassifierInput(
     weatherPayload,
     args.latitude,
     args.longitude,
     args.date
   );
+  Object.assign(apiMappedInput, lookupNearestContext(contextIndex, apiMappedInput));
   const rawFeatureMap = buildTrueClassifierFeatureMap(apiMappedInput, new Date(apiMappedInput.date));
   const { completedFeatureMap, missingFeatures } = imputeFeatureMap(
     rawFeatureMap,
@@ -101,6 +112,7 @@ async function main() {
       lat: args.latitude,
       long: args.longitude,
     },
+    contextSource: contextIndex.csvPath,
     apiMappedInput,
     wildfireProbability: probability,
     missingFeaturesImputed: missingFeatures,

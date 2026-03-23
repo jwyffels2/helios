@@ -10,6 +10,11 @@ const {
 const {
   fetchOpenMeteoArchive,
 } = require("./weather_api");
+const {
+  DEFAULT_CONTEXT_CSV,
+  buildContextIndex,
+  lookupNearestContext,
+} = require("./context_lookup");
 
 function parseArguments(argv) {
   const args = {
@@ -21,6 +26,7 @@ function parseArguments(argv) {
     minDistanceKm: 25,
     timeBufferDays: 1,
     maxAttempts: 5000,
+    contextCsv: DEFAULT_CONTEXT_CSV,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -48,6 +54,9 @@ function parseArguments(argv) {
       index += 1;
     } else if (token === "--max-attempts") {
       args.maxAttempts = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--context-csv") {
+      args.contextCsv = argv[index + 1];
       index += 1;
     }
   }
@@ -149,6 +158,9 @@ async function enrichSample(sample, label) {
     lat: sample.lat,
     long: sample.long,
     date: sample.date.toISOString(),
+    vegetationType: sample.vegetationType ?? null,
+    vegetation: sample.vegetation ?? null,
+    pdsi: sample.pdsi ?? null,
     ...weather,
   };
 }
@@ -157,6 +169,7 @@ async function main() {
   const args = parseArguments(process.argv.slice(2));
   const rng = createRng(args.seed);
   const rawRows = loadCsv(args.csv);
+  const contextIndex = buildContextIndex(args.contextCsv);
   const positiveCandidates = rawRows
     .map((row) => {
       const date = parseDateValue(row.date);
@@ -166,7 +179,14 @@ async function main() {
         return null;
       }
 
-      return { date, lat, long };
+      return {
+        date,
+        lat,
+        long,
+        vegetationType: parseNumber(row.Vegetation_Type_surface),
+        vegetation: parseNumber(row.Vegetation_surface),
+        pdsi: parseNumber(row.pdsi),
+      };
     })
     .filter(Boolean);
 
@@ -192,7 +212,10 @@ async function main() {
     const anchor = positiveCandidates[Math.floor(rng() * positiveCandidates.length)];
     const candidate = generateNegativeCandidate(anchor, bounds, rng);
     if (isFarFromPositives(candidate, positiveIndex, args.timeBufferDays, args.minDistanceKm)) {
-      negatives.push(candidate);
+      negatives.push({
+        ...candidate,
+        ...lookupNearestContext(contextIndex, candidate),
+      });
     }
   }
 
@@ -222,6 +245,7 @@ async function main() {
       minDistanceKm: args.minDistanceKm,
       timeBufferDays: args.timeBufferDays,
       seed: args.seed,
+      contextCsv: contextIndex.csvPath,
     },
     samples,
   };

@@ -149,17 +149,23 @@ node tools/wildfire-risk/live_true_classifier.js --lat 48.6411 --long -118.3751
 The true classifier currently uses:
 
 - latitude / longitude
+- elevation
 - temperature
 - relative humidity
 - dew point
 - precipitation
 - max and min daily temperature
+- vegetation class
+- vegetation amount / land cover proxy
+- PDSI drought proxy
 - wind components and wind speed
 - surface pressure
 - cloud cover
 - shallow soil temperature
 - shallow soil moisture
 - seasonal terms from date
+
+For live inference, the weather values come from Open-Meteo and the static/context fields (`vegetationType`, `vegetation`, `pdsi`) are pulled from the nearest seasonal match in the local FIRMS join CSV.
 
 ### Evaluation split
 
