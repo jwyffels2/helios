@@ -153,12 +153,12 @@ function splitTemporal(records, ratio = 0.8) {
   };
 }
 
-function computeImputationStats(records) {
-  const sums = Object.fromEntries(FEATURE_NAMES.map((name) => [name, 0]));
-  const counts = Object.fromEntries(FEATURE_NAMES.map((name) => [name, 0]));
+function computeImputationStats(records, featureNames = FEATURE_NAMES) {
+  const sums = Object.fromEntries(featureNames.map((name) => [name, 0]));
+  const counts = Object.fromEntries(featureNames.map((name) => [name, 0]));
 
   for (const record of records) {
-    for (const featureName of FEATURE_NAMES) {
+    for (const featureName of featureNames) {
       const value = record.features[featureName];
       if (value !== null && Number.isFinite(value)) {
         sums[featureName] += value;
@@ -168,17 +168,17 @@ function computeImputationStats(records) {
   }
 
   const means = {};
-  FEATURE_NAMES.forEach((featureName) => {
+  featureNames.forEach((featureName) => {
     means[featureName] = counts[featureName] > 0 ? sums[featureName] / counts[featureName] : 0;
   });
 
   return means;
 }
 
-function applyImputation(records, means) {
+function applyImputation(records, means, featureNames = FEATURE_NAMES) {
   for (const record of records) {
     const missing = [];
-    for (const featureName of FEATURE_NAMES) {
+    for (const featureName of featureNames) {
       if (record.features[featureName] === null || !Number.isFinite(record.features[featureName])) {
         record.features[featureName] = means[featureName];
         missing.push(featureName);
@@ -188,11 +188,11 @@ function applyImputation(records, means) {
   }
 }
 
-function computeNormalizationStats(records) {
+function computeNormalizationStats(records, featureNames = FEATURE_NAMES) {
   const means = {};
   const stds = {};
 
-  FEATURE_NAMES.forEach((featureName) => {
+  featureNames.forEach((featureName) => {
     const values = records.map((record) => record.features[featureName]);
     const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
     const variance = values.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / values.length;
@@ -203,18 +203,18 @@ function computeNormalizationStats(records) {
   return { means, stds };
 }
 
-function normalizeVector(featureMap, stats) {
-  return FEATURE_NAMES.map((featureName) => {
+function normalizeVector(featureMap, stats, featureNames = FEATURE_NAMES) {
+  return featureNames.map((featureName) => {
     const centered = featureMap[featureName] - stats.means[featureName];
     return centered / stats.stds[featureName];
   });
 }
 
-function imputeFeatureMap(featureMap, means) {
+function imputeFeatureMap(featureMap, means, featureNames = FEATURE_NAMES) {
   const completedFeatureMap = { ...featureMap };
   const missingFeatures = [];
 
-  FEATURE_NAMES.forEach((featureName) => {
+  featureNames.forEach((featureName) => {
     if (completedFeatureMap[featureName] === null || Number.isNaN(completedFeatureMap[featureName])) {
       completedFeatureMap[featureName] = means[featureName];
       missingFeatures.push(featureName);
@@ -249,7 +249,8 @@ function trainLogisticRegression(records, options = {}) {
   const epochs = options.epochs ?? 600;
   const learningRate = options.learningRate ?? 0.05;
   const l2Penalty = options.l2Penalty ?? 0.001;
-  const weights = new Array(FEATURE_NAMES.length).fill(0);
+  const vectorLength = records.length > 0 ? records[0].vector.length : 0;
+  const weights = new Array(vectorLength).fill(0);
   let bias = 0;
 
   for (let epoch = 0; epoch < epochs; epoch += 1) {

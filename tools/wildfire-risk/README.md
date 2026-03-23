@@ -109,3 +109,50 @@ The key fields you need from a live source are:
 - optional vegetation or land-cover context from a static source
 
 If you want a real wildfire probability model instead of this proxy, you will need explicit negative examples or a second dataset containing non-fire coordinate/time samples.
+
+## True classifier pipeline
+
+There is now a second pipeline that builds a true binary fire-vs-background classifier by generating explicit non-fire negatives.
+
+### How the negatives are built
+
+1. Start from the FIRMS detections as positive examples.
+2. Sample background coordinate/time candidates near the same geographic region and season.
+3. Reject candidates that are too close to known detections in space or time.
+4. Fetch historical weather for both positives and negatives from Open-Meteo archive data.
+5. Train a binary classifier on the resulting labeled dataset.
+
+This is a true classifier because it has explicit negative samples, but it is still not field-truth perfect because the negative class is sampled background rather than manually verified non-fire ground truth.
+
+### Build a labeled training dataset
+
+```powershell
+node tools/wildfire-risk/build_true_classifier_dataset.js --positives 25 --negatives 25
+```
+
+This writes `tools/wildfire-risk/output/true_classifier_dataset.json`.
+
+### Train the true classifier
+
+```powershell
+node tools/wildfire-risk/train_true_classifier.js
+```
+
+This writes `tools/wildfire-risk/output/true_classifier_model.json`.
+
+### Run live inference with the true classifier
+
+```powershell
+node tools/wildfire-risk/live_true_classifier.js --lat 48.6411 --long -118.3751
+```
+
+The true classifier currently uses:
+
+- latitude / longitude
+- temperature
+- precipitation
+- max and min daily temperature
+- wind components and wind speed
+- shallow soil temperature
+- shallow soil moisture
+- seasonal terms from date
