@@ -156,3 +156,13 @@ The true classifier currently uses:
 - shallow soil temperature
 - shallow soil moisture
 - seasonal terms from date
+
+### Evaluation split
+
+The true classifier no longer uses a simple time-only split.
+
+- `train`: older samples from seen regions
+- `validation`: later samples from seen regions
+- `test`: later samples from held-out geographic cells
+
+That makes the final test set harder and reduces the chance that the model is just memorizing local patterns from nearby coordinates.
