@@ -1,5 +1,9 @@
 "use strict";
 
+// Defines the feature schema for the true wildfire classifier.
+// This file is the shared contract between dataset generation, training, and
+// inference so every stage builds the same numeric feature vector.
+
 const {
   parseDateValue,
   parseNumber,

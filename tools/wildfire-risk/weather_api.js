@@ -1,5 +1,9 @@
 "use strict";
 
+// Wraps Open-Meteo access for the wildfire model pipeline.
+// This file owns request shaping, local response caching, retry/backoff
+// behavior, and mapping raw weather payloads into the model's feature names.
+
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");

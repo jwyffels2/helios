@@ -1,5 +1,10 @@
 "use strict";
 
+// Builds the labeled training dataset for the true wildfire classifier.
+// This script samples positive fire detections, generates explicit non-fire
+// negatives, enriches both with historical weather/context data, and writes
+// checkpointed progress so long runs can resume after interruptions.
+
 const path = require("path");
 const {
   loadCsv,

@@ -1,5 +1,10 @@
 "use strict";
 
+// Looks up static or slowly changing context features for a coordinate/date.
+// It builds an index from the local FIRMS feature join and returns the nearest
+// seasonal match so live scoring can reuse vegetation and drought context even
+// when the weather API does not provide those fields directly.
+
 const path = require("path");
 const {
   loadCsv,

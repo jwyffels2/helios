@@ -1,5 +1,10 @@
 "use strict";
 
+// Scores one coordinate/date request with the true wildfire classifier.
+// This is the single-point demo/inference entry point: it fetches or replays
+// weather data, merges nearest context features, runs the model, and prints the
+// calibrated probability plus the completed feature set.
+
 const fs = require("fs");
 const path = require("path");
 const {

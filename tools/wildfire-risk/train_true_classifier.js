@@ -1,5 +1,9 @@
 "use strict";
 
+// Trains the true wildfire classifier from a generated labeled dataset.
+// This script handles the geo/time split, normalization, calibration, metric
+// reporting, and writes the model artifact used by live and batch inference.
+
 const path = require("path");
 const {
   applyImputation,

@@ -1,5 +1,10 @@
 "use strict";
 
+// Verifies that the true wildfire classifier can score a fixed fixture input.
+// This is a lightweight regression check for the inference path: it confirms
+// the model loads, probabilities stay in range, and the fixture does not
+// require unexpected imputations.
+
 const path = require("path");
 const {
   loadJson,

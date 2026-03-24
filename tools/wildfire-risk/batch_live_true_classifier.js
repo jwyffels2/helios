@@ -1,5 +1,10 @@
 "use strict";
 
+// Scores a CSV of coordinate requests with the true wildfire classifier.
+// This is the batch demo path: it loads multiple locations, fetches or replays
+// weather data for each row, ranks the results, and writes CSV/JSON outputs for
+// presentation or downstream review.
+
 const path = require("path");
 const {
   loadCsv,
