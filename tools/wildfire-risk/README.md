@@ -132,6 +132,25 @@ node tools/wildfire-risk/build_true_classifier_dataset.js --positives 25 --negat
 
 This writes `tools/wildfire-risk/output/true_classifier_dataset.json`.
 
+For larger runs, the generator now:
+
+- throttles archive requests
+- retries with exponential backoff on `429`
+- checkpoints partial progress to the output dataset file
+- resumes automatically from a compatible partial dataset
+
+Useful flags for larger runs:
+
+```powershell
+node tools/wildfire-risk/build_true_classifier_dataset.js --positives 1000 --negatives 1000 --max-attempts 50000 --request-delay-ms 250 --checkpoint-every 25
+```
+
+To ignore an existing partial dataset and start over:
+
+```powershell
+node tools/wildfire-risk/build_true_classifier_dataset.js --positives 1000 --negatives 1000 --fresh
+```
+
 ### Train the true classifier
 
 ```powershell

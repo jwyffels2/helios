@@ -6,6 +6,7 @@ const path = require("path");
 
 const DEFAULT_CACHE_DIR = path.join(__dirname, "output", "cache", "open-meteo");
 const FORECAST_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
+let nextRequestAllowedAt = 0;
 
 function toIsoHourString(value) {
   if (!value) {
@@ -56,6 +57,12 @@ function ensureDirectoryExists(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true });
 }
 
+function sleep(milliseconds) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
 function buildCachePath(cacheKey, url) {
   const hash = crypto.createHash("sha1").update(url.toString()).digest("hex");
   return path.join(DEFAULT_CACHE_DIR, `${cacheKey}-${hash}.json`);
@@ -89,24 +96,59 @@ function writeCache(cachePath, url, payload) {
   }, null, 2)}\n`, "utf8");
 }
 
-async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFINITY) {
+async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFINITY, requestOptions = {}) {
   const cachePath = buildCachePath(cacheKey, url);
   const cachedPayload = readCache(cachePath, maxAgeMs);
   if (cachedPayload) {
     return cachedPayload;
   }
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Open-Meteo request failed with status ${response.status}`);
+  const maxRetries = requestOptions.maxRetries ?? 6;
+  const initialBackoffMs = requestOptions.initialBackoffMs ?? 2000;
+  const requestDelayMs = requestOptions.requestDelayMs ?? 0;
+  let backoffMs = initialBackoffMs;
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const now = Date.now();
+    if (now < nextRequestAllowedAt) {
+      await sleep(nextRequestAllowedAt - now);
+    }
+    nextRequestAllowedAt = Date.now() + requestDelayMs;
+
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const payload = await response.json();
+        writeCache(cachePath, url, payload);
+        return payload;
+      }
+
+      if (response.status !== 429 || attempt === maxRetries) {
+        throw new Error(`Open-Meteo request failed with status ${response.status}`);
+      }
+
+      const retryAfterHeader = response.headers.get("retry-after");
+      const retryAfterSeconds = Number(retryAfterHeader);
+      const retryDelayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? retryAfterSeconds * 1000
+        : backoffMs;
+      await sleep(retryDelayMs);
+      backoffMs = Math.min(backoffMs * 2, 60000);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxRetries) {
+        break;
+      }
+      await sleep(backoffMs);
+      backoffMs = Math.min(backoffMs * 2, 60000);
+    }
   }
 
-  const payload = await response.json();
-  writeCache(cachePath, url, payload);
-  return payload;
+  throw lastError ?? new Error("Open-Meteo request failed after retries.");
 }
 
-async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime) {
+async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOptions = {}) {
   const targetDate = new Date(isoDateTime);
   const dateString = targetDate.toISOString().slice(0, 10);
   const url = new URL("https://archive-api.open-meteo.com/v1/archive");
@@ -135,7 +177,7 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime) {
   );
   url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
 
-  const payload = await fetchJsonWithCache(url, "archive");
+  const payload = await fetchJsonWithCache(url, "archive", Number.POSITIVE_INFINITY, requestOptions);
   const hourly = payload.hourly ?? {};
   const hourlyIndex = nearestHourlyIndex(hourly.time, targetDate);
   const windSpeed = hourlyIndex >= 0 ? hourly.wind_speed_10m?.[hourlyIndex] : null;
@@ -188,7 +230,9 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
   );
   url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
 
-  return fetchJsonWithCache(url, "forecast", FORECAST_CACHE_MAX_AGE_MS);
+  return fetchJsonWithCache(url, "forecast", FORECAST_CACHE_MAX_AGE_MS, {
+    requestDelayMs: 100,
+  });
 }
 
 function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, dateOverride) {

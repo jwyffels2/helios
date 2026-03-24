@@ -27,6 +27,11 @@ function parseArguments(argv) {
     timeBufferDays: 1,
     maxAttempts: 5000,
     contextCsv: DEFAULT_CONTEXT_CSV,
+    checkpointEvery: 25,
+    requestDelayMs: 250,
+    maxRetries: 6,
+    initialBackoffMs: 2000,
+    resume: true,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -58,6 +63,22 @@ function parseArguments(argv) {
     } else if (token === "--context-csv") {
       args.contextCsv = argv[index + 1];
       index += 1;
+    } else if (token === "--checkpoint-every") {
+      args.checkpointEvery = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--request-delay-ms") {
+      args.requestDelayMs = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--max-retries") {
+      args.maxRetries = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--initial-backoff-ms") {
+      args.initialBackoffMs = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--fresh") {
+      args.resume = false;
+    } else if (token === "--resume") {
+      args.resume = true;
     }
   }
 
@@ -152,7 +173,7 @@ function generateNegativeCandidate(anchor, bounds, rng) {
 }
 
 async function enrichSample(sample, label) {
-  const weather = await fetchOpenMeteoArchive(sample.lat, sample.long, sample.date.toISOString());
+  const weather = await fetchOpenMeteoArchive(sample.lat, sample.long, sample.date.toISOString(), sample.requestOptions);
   return {
     label,
     lat: sample.lat,
@@ -163,6 +184,62 @@ async function enrichSample(sample, label) {
     pdsi: sample.pdsi ?? null,
     ...weather,
   };
+}
+
+function sampleKey(sample) {
+  const lat = Number(sample.lat).toFixed(6);
+  const long = Number(sample.long).toFixed(6);
+  const date = new Date(sample.date).toISOString();
+  return `${sample.label}|${date}|${lat}|${long}`;
+}
+
+function buildGenerationParameters(args, contextIndex) {
+  return {
+    positives: args.positives,
+    negatives: args.negatives,
+    minDistanceKm: args.minDistanceKm,
+    timeBufferDays: args.timeBufferDays,
+    seed: args.seed,
+    contextCsv: contextIndex.csvPath,
+  };
+}
+
+function progressSummary(samples) {
+  const positiveCount = samples.filter((sample) => sample.label === 1).length;
+  const negativeCount = samples.length - positiveCount;
+  return {
+    positiveCount,
+    negativeCount,
+    totalCount: samples.length,
+  };
+}
+
+function saveProgressDocument(args, contextIndex, samples, status, note = null) {
+  const document = {
+    datasetType: "historical_fire_vs_background",
+    createdAt: new Date().toISOString(),
+    status,
+    note,
+    sourceCsv: path.resolve(args.csv),
+    generationParameters: buildGenerationParameters(args, contextIndex),
+    progress: progressSummary(samples),
+    samples,
+  };
+
+  saveJson(args.output, document);
+}
+
+function generationParametersMatch(existingDocument, args, contextIndex) {
+  const existing = existingDocument?.generationParameters ?? {};
+  const current = buildGenerationParameters(args, contextIndex);
+
+  return existing.positives === current.positives
+    && existing.negatives === current.negatives
+    && existing.minDistanceKm === current.minDistanceKm
+    && existing.timeBufferDays === current.timeBufferDays
+    && existing.seed === current.seed
+    && existing.contextCsv === current.contextCsv
+    && path.resolve(existingDocument.sourceCsv ?? "") === path.resolve(args.csv);
 }
 
 async function main() {
@@ -223,37 +300,71 @@ async function main() {
     throw new Error(`Only generated ${negatives.length} negatives after ${args.maxAttempts} attempts.`);
   }
 
-  const samples = [];
-
-  for (const positive of selectedPositives) {
-    samples.push(await enrichSample(positive, 1));
+  let samples = [];
+  if (args.resume) {
+    try {
+      const existing = require("./common").loadJson(args.output);
+      if (generationParametersMatch(existing, args, contextIndex)) {
+        samples = Array.isArray(existing.samples) ? existing.samples : [];
+      }
+    } catch {
+      samples = [];
+    }
   }
 
-  for (const negative of negatives) {
-    samples.push(await enrichSample(negative, 0));
+  const completedKeys = new Set(samples.map(sampleKey));
+  const plannedSamples = [
+    ...selectedPositives.map((positive) => ({ ...positive, label: 1 })),
+    ...negatives.map((negative) => ({ ...negative, label: 0 })),
+  ];
+  const plannedTotal = plannedSamples.length;
+
+  if (samples.length >= plannedTotal) {
+    saveProgressDocument(args, contextIndex, samples, "complete", "dataset already complete");
+    console.log(`Dataset already complete at ${path.resolve(args.output)}`);
+    console.log(`Positive samples: ${progressSummary(samples).positiveCount}`);
+    console.log(`Negative samples: ${progressSummary(samples).negativeCount}`);
+    return;
+  }
+
+  let sinceCheckpoint = 0;
+  for (const plannedSample of plannedSamples) {
+    if (completedKeys.has(sampleKey(plannedSample))) {
+      continue;
+    }
+
+    try {
+      const enriched = await enrichSample(
+        {
+          ...plannedSample,
+          requestOptions: {
+            requestDelayMs: args.requestDelayMs,
+            maxRetries: args.maxRetries,
+            initialBackoffMs: args.initialBackoffMs,
+          },
+        },
+        plannedSample.label
+      );
+      samples.push(enriched);
+      completedKeys.add(sampleKey(enriched));
+      sinceCheckpoint += 1;
+
+      if (sinceCheckpoint >= args.checkpointEvery) {
+        saveProgressDocument(args, contextIndex, samples, "in_progress");
+        console.log(`Checkpointed ${samples.length}/${plannedTotal} samples to ${path.resolve(args.output)}`);
+        sinceCheckpoint = 0;
+      }
+    } catch (error) {
+      saveProgressDocument(args, contextIndex, samples, "in_progress", error.message);
+      throw new Error(`${error.message}. Progress saved to ${path.resolve(args.output)}.`);
+    }
   }
 
   samples.sort((left, right) => new Date(left.date) - new Date(right.date));
-
-  const document = {
-    datasetType: "historical_fire_vs_background",
-    createdAt: new Date().toISOString(),
-    sourceCsv: path.resolve(args.csv),
-    generationParameters: {
-      positives: args.positives,
-      negatives: args.negatives,
-      minDistanceKm: args.minDistanceKm,
-      timeBufferDays: args.timeBufferDays,
-      seed: args.seed,
-      contextCsv: contextIndex.csvPath,
-    },
-    samples,
-  };
-
-  saveJson(args.output, document);
+  saveProgressDocument(args, contextIndex, samples, "complete");
   console.log(`Saved dataset to ${path.resolve(args.output)}`);
-  console.log(`Positive samples: ${selectedPositives.length}`);
-  console.log(`Negative samples: ${negatives.length}`);
+  console.log(`Positive samples: ${progressSummary(samples).positiveCount}`);
+  console.log(`Negative samples: ${progressSummary(samples).negativeCount}`);
 }
 
 main().catch((error) => {
