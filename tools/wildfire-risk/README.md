@@ -270,6 +270,12 @@ Train a smoke-test model:
 node tools/wildfire-risk/train_true_classifier.js --input tools/wildfire-risk/output/true_classifier_dataset_smoke.json --output tools/wildfire-risk/output/true_classifier_model_smoke.json
 ```
 
+By default, training now requires the dataset JSON to report `status: "complete"`. To intentionally train on a partial checkpointed dataset:
+
+```powershell
+node tools/wildfire-risk/train_true_classifier.js --allow-partial
+```
+
 Run deterministic fixture verification:
 
 ```powershell

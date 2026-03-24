@@ -33,6 +33,7 @@ function parseArguments(argv) {
     testRegionRatio: 0.25,
     validationTimeRatio: 0.2,
     geoCellDegrees: 2,
+    allowPartial: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -64,6 +65,8 @@ function parseArguments(argv) {
     } else if (token === "--geo-cell-degrees") {
       args.geoCellDegrees = Number(argv[index + 1]);
       index += 1;
+    } else if (token === "--allow-partial") {
+      args.allowPartial = true;
     }
   }
 
@@ -166,6 +169,11 @@ function summarizeMetrics(scoredRecords) {
 function main() {
   const args = parseArguments(process.argv.slice(2));
   const dataset = loadJson(args.input);
+  if (!args.allowPartial && dataset.status !== "complete") {
+    throw new Error(
+      `Dataset status is ${JSON.stringify(dataset.status ?? null)}. Refusing to train until the dataset is complete. Re-run the generator or pass --allow-partial to override.`
+    );
+  }
   const records = dataset.samples.map((sample) => {
     const timestamp = new Date(sample.date);
     return {
