@@ -10,6 +10,7 @@ procedure Tests is
    FB_Width  : constant Natural := 160;
    FB_Height : constant Natural := 120;
    FB_Size   : constant Natural := FB_Width * FB_Height;
+   Pattern_Hold_Iterations : constant Positive := 100_000_000;
 
    subtype Color_332 is Unsigned_8;
    subtype X_Coord is Natural range 0 .. FB_Width - 1;
@@ -120,29 +121,31 @@ procedure Tests is
       end loop;
    end Wait_Spin;
 
+   procedure Run_Demo_Pass is
+   begin
+      Fill (16#00#);
+      Put_Line ("Pattern 1: solid black");
+      Wait_Spin (Pattern_Hold_Iterations);
+
+      Draw_Bars;
+      Put_Line ("Pattern 2: RGBW bars");
+      Wait_Spin (Pattern_Hold_Iterations);
+
+      Draw_Checkerboard (8);
+      Put_Line ("Pattern 3: checkerboard");
+      Wait_Spin (Pattern_Hold_Iterations);
+
+      Run_XBus_Write_Test;
+      Put_Line ("Pattern 4: XBUS lane and boundary writes");
+      Wait_Spin (Pattern_Hold_Iterations);
+   end Run_Demo_Pass;
+
 begin
    -- Keep the demo UART aligned with the default bootloader terminal setup.
    Uart0.Init (19200);
    Put_Line ("Framebuffer test start");
-
-   Fill (16#00#);
-   Put_Line ("Pattern 1: solid black");
-   Wait_Spin (30_000_000);
-
-   Draw_Bars;
-   Put_Line ("Pattern 2: RGBW bars");
-   Wait_Spin (30_000_000);
-
-   Draw_Checkerboard (8);
-   Put_Line ("Pattern 3: checkerboard");
-   Wait_Spin (30_000_000);
-
-   Run_XBus_Write_Test;
-   Put_Line ("Pattern 4: XBUS lane and boundary writes");
-   Wait_Spin (30_000_000);
-
-   Put_Line ("Framebuffer test complete");
    loop
-      null;
+      Run_Demo_Pass;
+      Put_Line ("Framebuffer test loop restart");
    end loop;
 end Tests;
