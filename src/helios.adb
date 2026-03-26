@@ -5,7 +5,8 @@ with PWM_API;     use PWM_API;
 with GPIO_API;    use GPIO_API;
 with neorv32;     use neorv32;
 with neorv32.TWI; use neorv32.TWI;
-with TWI;         use TWI;
+with TWI_API;     use TWI_API;
+with I2C_API;     use I2C_API;
 
 procedure Helios is
    -- Create PWM
@@ -21,22 +22,22 @@ begin
    Pwm0.Configure (Target_Hz => 25_000_000.0, Duty => 0.5);
    Pwm0.Enable;
 
-   TWI.TWI_Setup (Prescaler => 6, Clock_Div => 15, Allow_Clock_Stretching => False);
---     TWI.Scan_TWI;
-   --  pingResponse := TWI.I2C_Ping (CAMERA_ADDRESS);
+   TWI_API.TWI_Setup (Prescaler => 6, Clock_Div => 15, Allow_Clock_Stretching => False);
+--     TWI_API.Scan_TWI;
+   --  pingResponse := I2C_API.I2C_Ping (CAMERA_ADDRESS);
    --  if pingResponse then
    --      Ada.Text_IO.Put_Line ("Ping Response Recieved");
    --  else
    --      Ada.Text_IO.Put_Line ("Something is wrong!");
    --  end if;
 
-   TWI.I2C_Write (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER, Value => TEST_PATTERN_CONFIG);
-   if TWI.I2C_Read (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER) = TEST_PATTERN_CONFIG then
+   I2C_API.I2C_Write (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER, Value => TEST_PATTERN_CONFIG);
+   if I2C_API.I2C_Read (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER) = TEST_PATTERN_CONFIG then
       Ada.Text_IO.Put_Line ("Set Register Properly");
    else
       Ada.Text_IO.Put_Line ("Does Not Work Sir");
 
-      --  output := TWI.I2C_Read (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER)'Image;
+      --  output := I2C_API.I2C_Read (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER)'Image;
    end if;
 
    --  Ada.Text_IO.Put_Line ("Chip ID High:" &
