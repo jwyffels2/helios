@@ -1,5 +1,6 @@
 with "third_party/helios-neorv32-setups/neorv32-hal/neorv32_hal.gpr";
 with "bare_runtime.gpr";
+with "min.gpr";
 
 abstract project Helios_Common is
 
@@ -38,9 +39,6 @@ abstract project Helios_Common is
            ,"-gnatyx" -- Check extra parentheses
            ,"-gnatW8" -- UTF-8 encoding for wide characters
           );
-
-
-
 
    for Create_Missing_Dirs use "True";
    for Target              use "riscv64-elf";

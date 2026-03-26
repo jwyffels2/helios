@@ -19,7 +19,7 @@ set_property IOSTANDARD LVCMOS33 [get_ports uart0_rxd_i]
 set_property PACKAGE_PIN A18 [get_ports uart0_txd_o]
 set_property IOSTANDARD LVCMOS33 [get_ports uart0_txd_o]
 
-## Optional GPIO outputs (connect to on-board LEDs LD0–LD7)
+## Optional GPIO outputs (connect to on-board LEDs LD0-LD7)
 set_property PACKAGE_PIN U16 [get_ports {gpio_o[0]}]
 set_property PACKAGE_PIN E19 [get_ports {gpio_o[1]}]
 set_property PACKAGE_PIN U19 [get_ports {gpio_o[2]}]
@@ -27,31 +27,23 @@ set_property PACKAGE_PIN V19 [get_ports {gpio_o[3]}]
 set_property PACKAGE_PIN W18 [get_ports {gpio_o[4]}]
 set_property PACKAGE_PIN U15 [get_ports {gpio_o[5]}]
 set_property PACKAGE_PIN U14 [get_ports {gpio_o[6]}]
-#set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
 
 # Extra GPIO output currently routed to the reset pin header location.
 set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
-
-
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 
-
-# Camera External Clock PWM
-set_property PACKAGE_PIN A15 [get_ports pwm_o[0]]
+# Camera external clock PWM
+set_property PACKAGE_PIN K17 [get_ports pwm_o[0]]
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
 
-# TWI input and output are intentionally mapped to the same package pins.
-set_property PACKAGE_PIN P17 [get_ports twi_sda_i]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_i]
+# TWI uses shared open-drain pads with pull-ups.
+set_property PACKAGE_PIN N17 [get_ports {twi_sda_io}]
+set_property IOSTANDARD LVCMOS33 [get_ports {twi_sda_io}]
+set_property PULLUP true [get_ports {twi_sda_io}]
 
-set_property PACKAGE_PIN P17 [get_ports twi_sda_o]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_sda_o]
-
-set_property PACKAGE_PIN N17 [get_ports twi_scl_i]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_i]
-
-set_property PACKAGE_PIN N17 [get_ports twi_scl_o]
-set_property IOSTANDARD LVCMOS33 [get_ports twi_scl_o]
+set_property PACKAGE_PIN M19 [get_ports {twi_scl_io}]
+set_property IOSTANDARD LVCMOS33 [get_ports {twi_scl_io}]
+set_property PULLUP true [get_ports {twi_scl_io}]
 
 ## VGA output
 set_property PACKAGE_PIN P19 [get_ports vga_hsync_o]
@@ -77,8 +69,6 @@ set_property PACKAGE_PIN L18 [get_ports {vga_b_o[1]}]
 set_property PACKAGE_PIN K18 [get_ports {vga_b_o[2]}]
 set_property PACKAGE_PIN J18 [get_ports {vga_b_o[3]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {vga_b_o[*]}]
-
-
 
 ## Bitstream configuration
 set_property BITSTREAM.GENERAL.COMPRESS TRUE [current_design]

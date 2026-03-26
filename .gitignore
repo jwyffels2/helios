@@ -21,3 +21,5 @@ xvhdl.pb
 rtl/tb/xsim.dir/
 rtl/tb/*.wdb
 
+.als-alire
+
