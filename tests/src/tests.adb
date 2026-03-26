@@ -121,7 +121,8 @@ procedure Tests is
    end Wait_Spin;
 
 begin
-   Uart0.Init (115200);
+   -- Keep the demo UART aligned with the default bootloader terminal setup.
+   Uart0.Init (19200);
    Put_Line ("Framebuffer test start");
 
    Fill (16#00#);
