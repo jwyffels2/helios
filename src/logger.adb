@@ -83,6 +83,21 @@ package body Logger is
    --  Helper function implementations
    ----------------------------------------------------------------------------
 
+   function Format_Message (Level : Log_Level; Message : String) return String
+   is
+      ANSI_Color   : constant String := Level_Color (Level);
+      Level_Image  : constant String := Log_Level'Image (Level);
+      Level_String : constant String :=
+        Level_Image (Level_Image'First .. Level_Image'Last);
+      ANSI_Reset   : constant String := (if Color_Enabled then Reset else "");
+   begin
+      return
+        (ANSI_Color &
+         "[" & Level_String & "] " &
+         Message &
+         ANSI_Reset);
+   end Format_Message;
+
    function Level_Color (Level : Log_Level) return String
    is
    begin
@@ -98,20 +113,5 @@ package body Logger is
          when TRACE => return ASCII.ESC & "[38;2;160;0;160m";
       end case;
    end Level_Color;
-
-   function Format_Message (Level : Log_Level; Message : String) return String
-   is
-      ANSI_Color   : constant String := Level_Color (Level);
-      Level_Image  : constant String := Log_Level'Image (Level);
-      Level_String : constant String :=
-        Level_Image (Level_Image'First .. Level_Image'Last);
-      ANSI_Reset   : constant String := (if Color_Enabled then Reset else "");
-   begin
-      return
-        (ANSI_Color &
-         "[" & Level_String & "] " &
-         Message &
-         ANSI_Reset);
-   end Format_Message;
 
 end Logger;
