@@ -40,31 +40,31 @@ package body Logger is
    procedure Error (Message : String)
    is
    begin
-      Log (Error, Message);
+      Log (ERROR, Message);
    end Error;
 
    procedure Warn (Message : String)
    is
    begin
-      Log (Warn, Message);
+      Log (WARN, Message);
    end Warn;
 
    procedure Info (Message : String)
    is
    begin
-      Log (Info, Message);
+      Log (INFO, Message);
    end Info;
 
    procedure Debug (Message : String)
    is
    begin
-      Log (Debug, Message);
+      Log (DEBUG, Message);
    end Debug;
 
    procedure Trace (Message : String)
    is
    begin
-      Log (Trace, Message);
+      Log (TRACE, Message);
    end Trace;
 
    ----------------------------------------------------------------------------
@@ -91,11 +91,11 @@ package body Logger is
       end if;
 
       case Level is
-         when Error => return ASCII.ESC & "[38;2;255;48;64m";
-         when Warn  => return ASCII.ESC & "[38;2;255;192;0m";
-         when Info  => return ASCII.ESC & "[38;2;32;160;64m";
-         when Debug => return ASCII.ESC & "[38;2;0;128;255m";
-         when Trace => return ASCII.ESC & "[38;2;160;0;160m";
+         when ERROR => return ASCII.ESC & "[38;2;255;48;64m";
+         when WARN  => return ASCII.ESC & "[38;2;255;192;0m";
+         when INFO  => return ASCII.ESC & "[38;2;32;160;64m";
+         when DEBUG => return ASCII.ESC & "[38;2;0;128;255m";
+         when TRACE => return ASCII.ESC & "[38;2;160;0;160m";
       end case;
    end Level_Color;
 
