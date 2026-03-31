@@ -11,6 +11,10 @@ procedure Tests is
    FB_Height : constant Natural := 120;
    FB_Size   : constant Natural := FB_Width * FB_Height;
    Pattern_Hold_Iterations : constant Positive := 100_000_000;
+   Inter_Test_Iterations   : constant Positive := 100_000_000;
+   Loop_Restart_Iterations : constant Positive := 500_000_000;
+   Spin_Accumulator        : Unsigned_32 := 0;
+   pragma Volatile (Spin_Accumulator);
 
    subtype Color_332 is Unsigned_8;
    subtype X_Coord is Natural range 0 .. FB_Width - 1;
@@ -117,27 +121,37 @@ procedure Tests is
    procedure Wait_Spin (Iterations : Positive) is
    begin
       for I in 1 .. Iterations loop
-         null;
+         Spin_Accumulator := Spin_Accumulator + 1;
       end loop;
    end Wait_Spin;
+
+   procedure Inter_Test_Blackout is
+   begin
+      Fill (16#00#);
+      Wait_Spin (Inter_Test_Iterations);
+   end Inter_Test_Blackout;
 
    procedure Run_Demo_Pass is
    begin
       Fill (16#00#);
       Put_Line ("Pattern 1: solid black");
       Wait_Spin (Pattern_Hold_Iterations);
+      Inter_Test_Blackout;
 
       Draw_Bars;
       Put_Line ("Pattern 2: RGBW bars");
       Wait_Spin (Pattern_Hold_Iterations);
+      Inter_Test_Blackout;
 
       Draw_Checkerboard (8);
       Put_Line ("Pattern 3: checkerboard");
       Wait_Spin (Pattern_Hold_Iterations);
+      Inter_Test_Blackout;
 
       Run_XBus_Write_Test;
       Put_Line ("Pattern 4: XBUS lane and boundary writes");
       Wait_Spin (Pattern_Hold_Iterations);
+      Inter_Test_Blackout;
    end Run_Demo_Pass;
 
 begin
@@ -147,5 +161,6 @@ begin
    loop
       Run_Demo_Pass;
       Put_Line ("Framebuffer test loop restart");
+      Wait_Spin (Loop_Restart_Iterations);
    end loop;
 end Tests;
