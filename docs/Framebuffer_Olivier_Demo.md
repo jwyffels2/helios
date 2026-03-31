@@ -49,14 +49,12 @@ sequence loops.
 From repo root:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\build_framebuffer_demo.ps1
+podman machine start
+git submodule update --init --recursive third_party/min
+podman run --rm -v "${PWD}:/workspace" -w /workspace/tests localhost/helios-build:latest bash -lc "alr build && riscv64-elf-objcopy -O binary bin/tests bin/tests.bin && truncate -s %4 bin/tests.bin && gcc /workspace/third_party/helios-neorv32-setups/neorv32/sw/image_gen/image_gen.c -o /tmp/image_gen && /tmp/image_gen -i bin/tests.bin -o bin/tests.exe -t app_bin"
 ```
 
-That produces:
-
-```text
-tests\bin\tests.exe
-```
+That produces `tests\bin\tests.exe`.
 
 ## Program the FPGA
 
@@ -94,5 +92,4 @@ Expected monitor output:
 2. vertical RGBW bars
 3. checkerboard
 4. final pattern that shows byte-lane and boundary writes worked
-
 
