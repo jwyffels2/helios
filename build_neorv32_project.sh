@@ -7,7 +7,7 @@ IMAGE_GEN_SRC="$SCRIPT_DIR/third_party/helios-neorv32-setups/neorv32/sw/image_ge
 IMAGE_GEN_BIN="/usr/local/bin/image_gen"
 
 usage() {
-  echo "Usage: ./build_neorv32_project.sh [--clean|--no-clean] <elf_path>" >&2
+  echo "Usage: ./build_neorv32_project.sh <elf_path>" >&2
   echo "  example: ./build_neorv32_project.sh ./bin/helios" >&2
   echo "  example: ./build_neorv32_project.sh ./tests/bin/tests" >&2
   echo "  example: ./build_neorv32_project.sh --clean ./bin/helios" >&2
