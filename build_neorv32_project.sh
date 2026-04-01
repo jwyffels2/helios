@@ -10,16 +10,52 @@ usage() {
   echo "Usage: ./build_neorv32_project.sh <elf_path>" >&2
   echo "  example: ./build_neorv32_project.sh ./bin/helios" >&2
   echo "  example: ./build_neorv32_project.sh ./tests/bin/tests" >&2
+  echo "  example: ./build_neorv32_project.sh --clean ./bin/helios" >&2
   exit 1
 }
 
 main() {
+  local do_clean=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --clean)
+        do_clean=1
+        shift
+        ;;
+      --no-clean)
+        do_clean=0
+        shift
+        ;;
+      -*)
+        echo "Unknown option: $1" >&2
+        usage
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
   if [ "$#" -ne 1 ]; then
     usage
   fi
 
   local elf_input="$1"
   elf_input="${elf_input%/}"
+
+  if [ ! -f "$IMAGE_GEN_SRC" ]; then
+    echo "Error: missing NEORV32 image generator source at $IMAGE_GEN_SRC" >&2
+    echo "Run: git submodule update --init --recursive" >&2
+    exit 1
+  fi
+
+  local min_target_dir="$SCRIPT_DIR/third_party/min/target"
+  if [ ! -d "$min_target_dir" ]; then
+    echo "Error: missing MIN sources at $min_target_dir" >&2
+    echo "Run: git submodule update --init --recursive" >&2
+    exit 1
+  fi
 
   # Absolute path to the ELF
   local elf_dir elf_name abs_elf_path
@@ -46,7 +82,9 @@ main() {
   cd "$project_dir"
   alr index --update-all
   alr update
-  alr clean
+  if [ "$do_clean" -eq 1 ]; then
+    alr clean
+  fi
   alr build
 
   # Now do ELF -> .bin -> .exe in the project dir
