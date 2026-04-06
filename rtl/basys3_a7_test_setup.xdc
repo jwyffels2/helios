@@ -19,6 +19,13 @@ set_property IOSTANDARD LVCMOS33 [get_ports uart0_rxd_i]
 set_property PACKAGE_PIN A18 [get_ports uart0_txd_o]
 set_property IOSTANDARD LVCMOS33 [get_ports uart0_txd_o]
 
+## UART1 for camera on PMOD JA
+set_property PACKAGE_PIN J1 [get_ports uart1_rxd_i]
+set_property IOSTANDARD LVCMOS33 [get_ports uart1_rxd_i]
+
+set_property PACKAGE_PIN L2 [get_ports uart1_txd_o]
+set_property IOSTANDARD LVCMOS33 [get_ports uart1_txd_o]
+
 ## Optional GPIO outputs (connect to on-board LEDs LD0–LD7)
 set_property PACKAGE_PIN U16 [get_ports {gpio_o[0]}]
 set_property PACKAGE_PIN E19 [get_ports {gpio_o[1]}]
