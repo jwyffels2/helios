@@ -24,6 +24,12 @@ function firstValue(array) {
   return Array.isArray(array) && array.length > 0 ? array[0] : null;
 }
 
+function dateStringDaysBefore(date, daysBefore) {
+  const copy = new Date(date);
+  copy.setUTCDate(copy.getUTCDate() - daysBefore);
+  return copy.toISOString().slice(0, 10);
+}
+
 function windComponentsFromSpeedAndDirection(speed, directionDegrees) {
   if (!Number.isFinite(speed) || !Number.isFinite(directionDegrees)) {
     return { windU: null, windV: null };
@@ -34,6 +40,34 @@ function windComponentsFromSpeedAndDirection(speed, directionDegrees) {
     windU: -speed * Math.sin(angle),
     windV: -speed * Math.cos(angle),
   };
+}
+
+function finiteValues(values) {
+  return values.filter((value) => Number.isFinite(value));
+}
+
+function average(values) {
+  const finite = finiteValues(values);
+  if (finite.length === 0) {
+    return null;
+  }
+  return finite.reduce((sum, value) => sum + value, 0) / finite.length;
+}
+
+function sum(values) {
+  const finite = finiteValues(values);
+  if (finite.length === 0) {
+    return null;
+  }
+  return finite.reduce((total, value) => total + value, 0);
+}
+
+function maximum(values) {
+  const finite = finiteValues(values);
+  if (finite.length === 0) {
+    return null;
+  }
+  return Math.max(...finite);
 }
 
 function nearestHourlyIndex(times, targetDate) {
@@ -55,6 +89,65 @@ function nearestHourlyIndex(times, targetDate) {
   }
 
   return bestIndex;
+}
+
+function hourlyWindowValues(hourly, fieldName, targetDate, hoursBack) {
+  const times = hourly.time;
+  const values = hourly[fieldName];
+  if (!Array.isArray(times) || !Array.isArray(values)) {
+    return [];
+  }
+
+  const targetTime = targetDate.getTime();
+  const startTime = targetTime - (hoursBack * 60 * 60 * 1000);
+  const windowValues = [];
+
+  for (let index = 0; index < times.length; index += 1) {
+    const timestamp = new Date(toIsoHourString(times[index])).getTime();
+    if (timestamp > startTime && timestamp <= targetTime) {
+      windowValues.push(values[index]);
+    }
+  }
+
+  return windowValues;
+}
+
+function dailyValueForDate(daily, fieldName, targetDate) {
+  const times = daily?.time;
+  const values = daily?.[fieldName];
+  if (!Array.isArray(times) || !Array.isArray(values)) {
+    return firstValue(values);
+  }
+
+  const targetDay = targetDate.toISOString().slice(0, 10);
+  const index = times.findIndex((time) => time === targetDay);
+  return index >= 0 ? values[index] ?? null : firstValue(values);
+}
+
+function laggedWeatherFeatures(hourly, targetDate) {
+  const temperature24h = hourlyWindowValues(hourly, "temperature_2m", targetDate, 24);
+  const temperature72h = hourlyWindowValues(hourly, "temperature_2m", targetDate, 72);
+  const humidity24h = hourlyWindowValues(hourly, "relative_humidity_2m", targetDate, 24);
+  const humidity72h = hourlyWindowValues(hourly, "relative_humidity_2m", targetDate, 72);
+  const precipitation72h = hourlyWindowValues(hourly, "precipitation", targetDate, 72);
+  const precipitation7d = hourlyWindowValues(hourly, "precipitation", targetDate, 24 * 7);
+  const windSpeed7d = hourlyWindowValues(hourly, "wind_speed_10m", targetDate, 24 * 7);
+  const soilMoisture72h = hourlyWindowValues(hourly, "soil_moisture_0_to_7cm", targetDate, 72);
+  const soilMoisture7d = hourlyWindowValues(hourly, "soil_moisture_0_to_7cm", targetDate, 24 * 7);
+  const soilTemperature7d = hourlyWindowValues(hourly, "soil_temperature_0_to_7cm", targetDate, 24 * 7);
+
+  return {
+    temperature24hAvg: average(temperature24h),
+    temperature72hAvg: average(temperature72h),
+    humidity24hAvg: average(humidity24h),
+    humidity72hAvg: average(humidity72h),
+    precipitation72hTotal: sum(precipitation72h),
+    precipitation7dTotal: sum(precipitation7d),
+    windSpeed7dMax: maximum(windSpeed7d),
+    soilMoisture72hAvg: average(soilMoisture72h),
+    soilMoisture7dAvg: average(soilMoisture7d),
+    soilTemperature7dAvg: average(soilTemperature7d),
+  };
 }
 
 function ensureDirectoryExists(directoryPath) {
@@ -158,7 +251,7 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOp
   const url = new URL("https://archive-api.open-meteo.com/v1/archive");
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
-  url.searchParams.set("start_date", dateString);
+  url.searchParams.set("start_date", dateStringDaysBefore(targetDate, 7));
   url.searchParams.set("end_date", dateString);
   url.searchParams.set("timezone", "UTC");
   url.searchParams.set("temperature_unit", "celsius");
@@ -187,6 +280,7 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOp
   const windSpeed = hourlyIndex >= 0 ? hourly.wind_speed_10m?.[hourlyIndex] : null;
   const windDirection = hourlyIndex >= 0 ? hourly.wind_direction_10m?.[hourlyIndex] : null;
   const { windU, windV } = windComponentsFromSpeedAndDirection(windSpeed, windDirection);
+  const laggedFeatures = laggedWeatherFeatures(hourly, targetDate);
 
   return {
     lat: latitude,
@@ -197,14 +291,15 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOp
     relativeHumiditySurface: hourlyIndex >= 0 ? hourly.relative_humidity_2m?.[hourlyIndex] ?? null : null,
     dewPointSurface: hourlyIndex >= 0 ? hourly.dew_point_2m?.[hourlyIndex] ?? null : null,
     precipitation: hourlyIndex >= 0 ? hourly.precipitation?.[hourlyIndex] ?? null : null,
-    tmax: firstValue(payload.daily?.temperature_2m_max),
-    tmin: firstValue(payload.daily?.temperature_2m_min),
+    tmax: dailyValueForDate(payload.daily, "temperature_2m_max", targetDate),
+    tmin: dailyValueForDate(payload.daily, "temperature_2m_min", targetDate),
     windU,
     windV,
     surfacePressure: hourlyIndex >= 0 ? hourly.surface_pressure?.[hourlyIndex] ?? null : null,
     cloudCover: hourlyIndex >= 0 ? hourly.cloud_cover?.[hourlyIndex] ?? null : null,
     soilTemperatureSurface: hourlyIndex >= 0 ? hourly.soil_temperature_0_to_7cm?.[hourlyIndex] ?? null : null,
     soilMoistureSurface: hourlyIndex >= 0 ? hourly.soil_moisture_0_to_7cm?.[hourlyIndex] ?? null : null,
+    ...laggedFeatures,
   };
 }
 
@@ -213,6 +308,7 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
   url.searchParams.set("timezone", "UTC");
+  url.searchParams.set("past_days", "7");
   url.searchParams.set("forecast_days", "1");
   url.searchParams.set("temperature_unit", "celsius");
   url.searchParams.set("precipitation_unit", "mm");
@@ -232,6 +328,17 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
       "soil_moisture_0_to_7cm",
     ].join(",")
   );
+  url.searchParams.set(
+    "hourly",
+    [
+      "temperature_2m",
+      "relative_humidity_2m",
+      "precipitation",
+      "wind_speed_10m",
+      "soil_temperature_0_to_7cm",
+      "soil_moisture_0_to_7cm",
+    ].join(",")
+  );
   url.searchParams.set("daily", "temperature_2m_max,temperature_2m_min");
 
   return fetchJsonWithCache(url, "forecast", FORECAST_CACHE_MAX_AGE_MS, {
@@ -242,28 +349,31 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
 function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, dateOverride) {
   const current = payload.current ?? {};
   const daily = payload.daily ?? {};
+  const targetDate = new Date(dateOverride ?? (current.time ? `${current.time}Z` : null) ?? new Date().toISOString());
   const { windU, windV } = windComponentsFromSpeedAndDirection(
     current.wind_speed_10m,
     current.wind_direction_10m
   );
+  const laggedFeatures = laggedWeatherFeatures(payload.hourly ?? {}, targetDate);
 
   return {
     lat: latitude,
     long: longitude,
-    date: dateOverride ?? (current.time ? `${current.time}Z` : null) ?? new Date().toISOString(),
+    date: targetDate.toISOString(),
     elevation: payload.elevation ?? null,
     temperatureSurface: current.temperature_2m ?? null,
     relativeHumiditySurface: current.relative_humidity_2m ?? null,
     dewPointSurface: current.dew_point_2m ?? null,
     precipitation: current.precipitation ?? null,
-    tmax: firstValue(daily.temperature_2m_max),
-    tmin: firstValue(daily.temperature_2m_min),
+    tmax: dailyValueForDate(daily, "temperature_2m_max", targetDate),
+    tmin: dailyValueForDate(daily, "temperature_2m_min", targetDate),
     windU,
     windV,
     surfacePressure: current.surface_pressure ?? null,
     cloudCover: current.cloud_cover ?? null,
     soilTemperatureSurface: current.soil_temperature_0_to_7cm ?? null,
     soilMoistureSurface: current.soil_moisture_0_to_7cm ?? null,
+    ...laggedFeatures,
   };
 }
 

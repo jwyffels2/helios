@@ -49,9 +49,15 @@ function normalizeContextRow(row) {
     doy: dayOfYear(date),
     lat,
     long,
+    temperatureSurface: parseNumber(row.Temperature_surface),
+    precipitation: parseNumber(row.precipitation),
+    tmax: parseNumber(row.tmax),
+    tmin: parseNumber(row.tmin),
     vegetationType: parseNumber(row.Vegetation_Type_surface),
     vegetation: parseNumber(row.Vegetation_surface),
     pdsi: parseNumber(row.pdsi),
+    windU: parseNumber(row["u-component_of_wind_hybrid"]),
+    windV: parseNumber(row["v-component_of_wind_hybrid"]),
   };
 }
 
@@ -115,7 +121,7 @@ function lookupNearestContext(index, candidate, options = {}) {
     }
   }
 
-  return best
+  const result = best
     ? {
         vegetationType: best.vegetationType,
         vegetation: best.vegetation,
@@ -126,6 +132,28 @@ function lookupNearestContext(index, candidate, options = {}) {
         vegetation: null,
         pdsi: null,
       };
+
+  if (options.includeWeatherProxies) {
+    Object.assign(result, best
+      ? {
+          temperatureSurface: best.temperatureSurface,
+          precipitation: best.precipitation,
+          tmax: best.tmax,
+          tmin: best.tmin,
+          windU: best.windU,
+          windV: best.windV,
+        }
+      : {
+          temperatureSurface: null,
+          precipitation: null,
+          tmax: null,
+          tmin: null,
+          windU: null,
+          windV: null,
+        });
+  }
+
+  return result;
 }
 
 module.exports = {

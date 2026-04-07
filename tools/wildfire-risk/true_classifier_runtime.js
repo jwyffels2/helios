@@ -18,13 +18,14 @@ const {
 } = require("./true_classifier_common");
 
 function scoreTrueClassifierInput(inputRecord, model, fallbackDate) {
+  const featureNames = Array.isArray(model.features) ? model.features : TRUE_FEATURE_NAMES;
   const rawFeatureMap = buildTrueClassifierFeatureMap(inputRecord, fallbackDate);
   const { completedFeatureMap, missingFeatures } = imputeFeatureMap(
     rawFeatureMap,
     model.imputationMeans,
-    TRUE_FEATURE_NAMES
+    featureNames
   );
-  const vector = normalizeVector(completedFeatureMap, model.normalization, TRUE_FEATURE_NAMES);
+  const vector = normalizeVector(completedFeatureMap, model.normalization, featureNames);
   const rawLogit = predictLogit(vector, model);
   const rawProbability = predictProbability(vector, model);
   const calibratedProbability = calibrateLogit(rawLogit, model.calibration);

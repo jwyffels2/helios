@@ -119,8 +119,9 @@ There is now a second pipeline that builds a true binary fire-vs-background clas
 1. Start from the FIRMS detections as positive examples.
 2. Sample background coordinate/time candidates near the same geographic region and season.
 3. Reject candidates that are too close to known detections in space or time.
-4. Fetch historical weather for both positives and negatives from Open-Meteo archive data.
-5. Train a binary classifier on the resulting labeled dataset.
+4. Rank part of the negative pool as “hard negatives” using hot/dry/high-risk context from the local feature join.
+5. Fetch historical weather for both positives and negatives from Open-Meteo archive data.
+6. Train a binary classifier on the resulting labeled dataset.
 
 This is a true classifier because it has explicit negative samples, but it is still not field-truth perfect because the negative class is sampled background rather than manually verified non-fire ground truth.
 
@@ -138,11 +139,30 @@ For larger runs, the generator now:
 - retries with exponential backoff on `429`
 - checkpoints partial progress to the output dataset file
 - resumes automatically from a compatible partial dataset
+- refuses to reuse old checkpoints when the generated feature schema changes
 
 Useful flags for larger runs:
 
 ```powershell
 node tools/wildfire-risk/build_true_classifier_dataset.js --positives 1000 --negatives 1000 --max-attempts 50000 --request-delay-ms 250 --checkpoint-every 25
+```
+
+By default, half of the generated negatives are selected as hard negatives. These
+are still separated from FIRMS detections in space/time, but they are chosen from
+a larger candidate pool because they look more fire-prone: hotter, drier, low
+precipitation, windy, vegetated, and seasonally plausible. This makes the model
+learn a harder boundary than random background sampling alone.
+
+Hard-negative controls:
+
+```powershell
+node tools/wildfire-risk/build_true_classifier_dataset.js --positives 1000 --negatives 1000 --hard-negative-ratio 0.5 --hard-negative-pool-multiplier 4
+```
+
+To return to random background negatives only:
+
+```powershell
+node tools/wildfire-risk/build_true_classifier_dataset.js --positives 1000 --negatives 1000 --hard-negative-ratio 0
 ```
 
 To ignore an existing partial dataset and start over:
@@ -190,9 +210,16 @@ The true classifier currently uses:
 - cloud cover
 - shallow soil temperature
 - shallow soil moisture
+- lagged weather aggregates:
+  - 24h and 72h average temperature
+  - 24h and 72h average relative humidity
+  - 72h and 7-day precipitation totals
+  - 7-day max wind speed
+  - 72h and 7-day average shallow soil moisture
+  - 7-day average shallow soil temperature
 - seasonal terms from date
 
-For live inference, the weather values come from Open-Meteo and the static/context fields (`vegetationType`, `vegetation`, `pdsi`) are pulled from the nearest seasonal match in the local FIRMS join CSV.
+For live inference, current and lagged weather values come from Open-Meteo. The static/context fields (`vegetationType`, `vegetation`, `pdsi`) are pulled from the nearest seasonal match in the local FIRMS join CSV.
 
 ### Local API cache
 

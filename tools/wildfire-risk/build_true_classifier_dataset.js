@@ -21,6 +21,8 @@ const {
   lookupNearestContext,
 } = require("./context_lookup");
 
+const FEATURE_SCHEMA_VERSION = 2;
+
 function parseArguments(argv) {
   const args = {
     csv: "c:\\Users\\Leonard\\Desktop\\firms_ee_feature_join.csv",
@@ -36,6 +38,8 @@ function parseArguments(argv) {
     requestDelayMs: 250,
     maxRetries: 6,
     initialBackoffMs: 2000,
+    hardNegativeRatio: 0.5,
+    hardNegativePoolMultiplier: 4,
     resume: true,
   };
 
@@ -79,6 +83,12 @@ function parseArguments(argv) {
       index += 1;
     } else if (token === "--initial-backoff-ms") {
       args.initialBackoffMs = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--hard-negative-ratio") {
+      args.hardNegativeRatio = Number(argv[index + 1]);
+      index += 1;
+    } else if (token === "--hard-negative-pool-multiplier") {
+      args.hardNegativePoolMultiplier = Number(argv[index + 1]);
       index += 1;
     } else if (token === "--fresh") {
       args.resume = false;
@@ -177,6 +187,119 @@ function generateNegativeCandidate(anchor, bounds, rng) {
   };
 }
 
+function dayOfYear(date) {
+  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0));
+  const diff = date - start;
+  return Math.floor(diff / 86400000);
+}
+
+function normalizeUnit(value, minimum, maximum) {
+  if (!Number.isFinite(value) || maximum <= minimum) {
+    return 0.5;
+  }
+  return clamp((value - minimum) / (maximum - minimum), 0, 1);
+}
+
+function firstFinite(...values) {
+  return values.find((value) => Number.isFinite(value)) ?? null;
+}
+
+function seasonalFireScore(date) {
+  const doy = dayOfYear(date);
+  if (doy >= 150 && doy <= 280) {
+    return 1;
+  }
+  if ((doy >= 100 && doy < 150) || (doy > 280 && doy <= 320)) {
+    return 0.6;
+  }
+  return 0.25;
+}
+
+function hardNegativeScore(candidate) {
+  const temperature = firstFinite(candidate.temperatureSurface, candidate.tmax, candidate.tmin);
+  const precipitation = firstFinite(candidate.precipitation);
+  const pdsi = firstFinite(candidate.pdsi);
+  const vegetation = firstFinite(candidate.vegetation);
+  const windU = firstFinite(candidate.windU);
+  const windV = firstFinite(candidate.windV);
+  const windSpeed = windU !== null && windV !== null
+    ? Math.sqrt((windU ** 2) + (windV ** 2))
+    : null;
+
+  const hotScore = normalizeUnit(temperature, 15, 40);
+  const dryScore = pdsi === null ? 0.5 : normalizeUnit(-pdsi, 0, 6);
+  const lowPrecipScore = precipitation === null ? 0.5 : 1 - normalizeUnit(precipitation, 0, 10);
+  const vegetationScore = normalizeUnit(vegetation, 0, 100);
+  const windScore = normalizeUnit(windSpeed, 0, 12);
+  const seasonScore = seasonalFireScore(candidate.date);
+
+  return (
+    (0.30 * hotScore)
+    + (0.25 * dryScore)
+    + (0.15 * lowPrecipScore)
+    + (0.15 * vegetationScore)
+    + (0.10 * windScore)
+    + (0.05 * seasonScore)
+  );
+}
+
+function negativeCandidateKey(candidate) {
+  const lat = Number(candidate.lat).toFixed(4);
+  const long = Number(candidate.long).toFixed(4);
+  return `${toDateKey(candidate.date)}|${lat}|${long}`;
+}
+
+function generateNegativeCandidatePool(count, positiveCandidates, bounds, rng, positiveIndex, args, contextIndex) {
+  const candidates = [];
+  const seenKeys = new Set();
+  let attempts = 0;
+
+  while (candidates.length < count && attempts < args.maxAttempts) {
+    attempts += 1;
+    const anchor = positiveCandidates[Math.floor(rng() * positiveCandidates.length)];
+    const candidate = generateNegativeCandidate(anchor, bounds, rng);
+    if (!isFarFromPositives(candidate, positiveIndex, args.timeBufferDays, args.minDistanceKm)) {
+      continue;
+    }
+
+    const key = negativeCandidateKey(candidate);
+    if (seenKeys.has(key)) {
+      continue;
+    }
+
+    const withContext = {
+      ...candidate,
+      ...lookupNearestContext(contextIndex, candidate, { includeWeatherProxies: true }),
+    };
+
+    seenKeys.add(key);
+    candidates.push({
+      ...withContext,
+      hardNegativeScore: hardNegativeScore(withContext),
+    });
+  }
+
+  return {
+    attempts,
+    candidates,
+  };
+}
+
+function selectNegatives(candidatePool, args, rng) {
+  const hardNegativeCount = Math.min(
+    args.negatives,
+    Math.max(0, Math.round(args.negatives * clamp(args.hardNegativeRatio, 0, 1)))
+  );
+  const sortedByHardness = [...candidatePool].sort((left, right) => right.hardNegativeScore - left.hardNegativeScore);
+  const hardNegatives = sortedByHardness.slice(0, hardNegativeCount)
+    .map((candidate) => ({ ...candidate, negativeKind: "hard" }));
+  const hardKeys = new Set(hardNegatives.map(negativeCandidateKey));
+  const remaining = candidatePool.filter((candidate) => !hardKeys.has(negativeCandidateKey(candidate)));
+  const randomNegatives = sampleWithoutReplacement(remaining, args.negatives - hardNegatives.length, rng)
+    .map((candidate) => ({ ...candidate, negativeKind: "random" }));
+  return [...hardNegatives, ...randomNegatives];
+}
+
 async function enrichSample(sample, label) {
   const weather = await fetchOpenMeteoArchive(sample.lat, sample.long, sample.date.toISOString(), sample.requestOptions);
   return {
@@ -184,6 +307,8 @@ async function enrichSample(sample, label) {
     lat: sample.lat,
     long: sample.long,
     date: sample.date.toISOString(),
+    negativeKind: sample.negativeKind ?? null,
+    hardNegativeScore: sample.hardNegativeScore ?? null,
     vegetationType: sample.vegetationType ?? null,
     vegetation: sample.vegetation ?? null,
     pdsi: sample.pdsi ?? null,
@@ -200,10 +325,13 @@ function sampleKey(sample) {
 
 function buildGenerationParameters(args, contextIndex) {
   return {
+    featureSchemaVersion: FEATURE_SCHEMA_VERSION,
     positives: args.positives,
     negatives: args.negatives,
     minDistanceKm: args.minDistanceKm,
     timeBufferDays: args.timeBufferDays,
+    hardNegativeRatio: args.hardNegativeRatio,
+    hardNegativePoolMultiplier: args.hardNegativePoolMultiplier,
     seed: args.seed,
     contextCsv: contextIndex.csvPath,
   };
@@ -239,9 +367,12 @@ function generationParametersMatch(existingDocument, args, contextIndex) {
   const current = buildGenerationParameters(args, contextIndex);
 
   return existing.positives === current.positives
+    && existing.featureSchemaVersion === current.featureSchemaVersion
     && existing.negatives === current.negatives
     && existing.minDistanceKm === current.minDistanceKm
     && existing.timeBufferDays === current.timeBufferDays
+    && existing.hardNegativeRatio === current.hardNegativeRatio
+    && existing.hardNegativePoolMultiplier === current.hardNegativePoolMultiplier
     && existing.seed === current.seed
     && existing.contextCsv === current.contextCsv
     && path.resolve(existingDocument.sourceCsv ?? "") === path.resolve(args.csv);
@@ -286,20 +417,24 @@ async function main() {
 
   const selectedPositives = sampleWithoutReplacement(positiveCandidates, args.positives, rng);
   const positiveIndex = buildPositiveIndex(positiveCandidates);
-  const negatives = [];
-  let attempts = 0;
-
-  while (negatives.length < args.negatives && attempts < args.maxAttempts) {
-    attempts += 1;
-    const anchor = positiveCandidates[Math.floor(rng() * positiveCandidates.length)];
-    const candidate = generateNegativeCandidate(anchor, bounds, rng);
-    if (isFarFromPositives(candidate, positiveIndex, args.timeBufferDays, args.minDistanceKm)) {
-      negatives.push({
-        ...candidate,
-        ...lookupNearestContext(contextIndex, candidate),
-      });
-    }
-  }
+  const hardNegativeCount = Math.min(
+    args.negatives,
+    Math.max(0, Math.round(args.negatives * clamp(args.hardNegativeRatio, 0, 1)))
+  );
+  const negativePoolTarget = Math.max(
+    args.negatives,
+    args.negatives + (hardNegativeCount * (Math.max(1, args.hardNegativePoolMultiplier) - 1))
+  );
+  const { attempts, candidates: negativePool } = generateNegativeCandidatePool(
+    negativePoolTarget,
+    positiveCandidates,
+    bounds,
+    rng,
+    positiveIndex,
+    args,
+    contextIndex
+  );
+  const negatives = selectNegatives(negativePool, args, rng);
 
   if (negatives.length < args.negatives) {
     throw new Error(`Only generated ${negatives.length} negatives after ${args.maxAttempts} attempts.`);
