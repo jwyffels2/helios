@@ -1,49 +1,73 @@
-with Ada.Text_IO;
 with Uart0;
+with Uart1;
 with Gnat_Exit;
-with PWM_API;     use PWM_API;
-with GPIO_API;    use GPIO_API;
-with neorv32;     use neorv32;
-with neorv32.TWI; use neorv32.TWI;
-with TWI_API;     use TWI_API;
-with I2C_API;     use I2C_API;
+with Min;
 
 procedure Helios is
-   -- Create PWM
-   Pwm0 : PWM_T := PWM_API.Create (Channel => 0);
-   CAMERA_ADDRESS: I2C_Addr7 := 16#3C#;
-   TEST_PATTERN_REGISTER : UInt16 := 16#503D#;
-   TEST_PATTERN_CONFIG   : Integer := 2#10000000#;
-   pingResponse : Boolean;
-   testPatternResponse : Integer;
-   output : String := "";
+
+    procedure Delay_Loop (Count : Natural) is
+    begin
+        for I in 1 .. Count loop
+            null;
+        end loop;
+    end Delay_Loop;
+
+    procedure Send_Command is
+    begin
+        while not Uart1.TX_Ready loop
+            null;
+        end loop;
+        Uart1.Write_TX (Character'Val (16#56#));
+
+        while not Uart1.TX_Ready loop
+            null;
+        end loop;
+        Uart1.Write_TX (Character'Val (16#00#));
+
+        while not Uart1.TX_Ready loop
+            null;
+        end loop;
+        Uart1.Write_TX (Character'Val (16#26#));
+
+        while not Uart1.TX_Ready loop
+            null;
+        end loop;
+        Uart1.Write_TX (Character'Val (16#00#));
+    end Send_Command;
+
+    procedure Send_Test_Byte is
+    begin
+        while not Uart1.TX_Ready loop
+            null;
+        end loop;
+        Uart1.Write_TX (Character'Val (16#55#));
+    end Send_Test_Byte;
+
 begin
+    Uart0.Init (19200);
+    Uart1.Init (38400);
 
-   Pwm0.Configure (Target_Hz => 25_000_000.0, Duty => 0.5);
-   Pwm0.Enable;
+    Uart0.Put ("Boot ");
 
-   TWI_API.TWI_Setup (Prescaler => 6, Clock_Div => 15, Allow_Clock_Stretching => False);
---     TWI_API.Scan_TWI;
-   --  pingResponse := I2C_API.I2C_Ping (CAMERA_ADDRESS);
-   --  if pingResponse then
-   --      Ada.Text_IO.Put_Line ("Ping Response Recieved");
-   --  else
-   --      Ada.Text_IO.Put_Line ("Something is wrong!");
-   --  end if;
+    loop
+        Uart0.Put ("SEND ");
 
-   I2C_API.I2C_Write (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER, Value => TEST_PATTERN_CONFIG);
-   if I2C_API.I2C_Read (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER) = TEST_PATTERN_CONFIG then
-      Ada.Text_IO.Put_Line ("Set Register Properly");
-   else
-      Ada.Text_IO.Put_Line ("Does Not Work Sir");
+        Send_Command;
 
-      --  output := I2C_API.I2C_Read (Device_Address => CAMERA_ADDRESS, Register => TEST_PATTERN_REGISTER)'Image;
-   end if;
+        for I in 1 .. 20_000_000 loop
+            if Uart1.RX_Ready then
+                declare
+                    B : Integer := Character'Pos (Uart1.Read_RX);
+                begin
+                    Uart0.Put ("RX:");
+                    Uart0.Put (Integer'Image (B));
+                    Uart0.Put (" ");
+                end;
+            end if;
+        end loop;
 
-   --  Ada.Text_IO.Put_Line ("Chip ID High:" &
-   --      I2C_Read (CAMERA_ADDRESS, 16#300A#)'Image);
+        Uart0.Put ("| ");
 
-   --  Ada.Text_IO.Put_Line ("Chip ID Low:" &
-   --      I2C_Read (CAMERA_ADDRESS, 16#300B#)'Image);
+   end loop;
 
 end Helios;
