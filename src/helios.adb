@@ -2,6 +2,7 @@ with Uart0;
 with Uart1;
 with Gnat_Exit;
 with Min;
+with Coordinate_Listener;
 
 procedure Helios is
 
@@ -47,26 +48,42 @@ begin
     Uart0.Init (19200);
     Uart1.Init (38400);
 
+    Coordinate_Listener.Init;
+
     Uart0.Put ("Boot ");
 
     loop
-        Uart0.Put ("SEND ");
+        --  Listen for coordinates
+        Coordinate_Listener.Poll;
 
-        Send_Command;
+        --  Handle any available camera data
+        if Uart1.RX_Ready then
+            declare
+                B : Integer := Character'Pos (Uart1.Read_RX);
+            begin
+                Uart0.Put ("RX:");
+                Uart0.Put (Integer'Image (B));
+                Uart0.Put (" ");
+            end;
+        end if;
 
-        for I in 1 .. 20_000_000 loop
-            if Uart1.RX_Ready then
-                declare
-                    B : Integer := Character'Pos (Uart1.Read_RX);
-                begin
-                    Uart0.Put ("RX:");
-                    Uart0.Put (Integer'Image (B));
-                    Uart0.Put (" ");
-                end;
-            end if;
-        end loop;
+        --  Uart0.Put ("SEND ");
 
-        Uart0.Put ("| ");
+        --  Send_Command;
+
+        --  for I in 1 .. 20_000_000 loop
+        --      if Uart1.RX_Ready then
+        --          declare
+        --              B : Integer := Character'Pos (Uart1.Read_RX);
+        --          begin
+        --              Uart0.Put ("RX:");
+        --              Uart0.Put (Integer'Image (B));
+        --              Uart0.Put (" ");
+        --          end;
+        --      end if;
+        --  end loop;
+
+        --  Uart0.Put ("| ");
 
    end loop;
 

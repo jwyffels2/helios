@@ -71,7 +71,7 @@ begin
       BOOT_MODE_SELECT => 0,
 
       IMEM_EN   => true,
-      IMEM_SIZE => 32*1024,
+      IMEM_SIZE => 64*1024,
       DMEM_EN   => true,
       DMEM_SIZE => 8*1024,
 
