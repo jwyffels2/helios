@@ -73,7 +73,7 @@ begin
       IMEM_EN   => true,
       IMEM_SIZE => 32*1024,
       DMEM_EN   => true,
-      DMEM_SIZE => 8*1024,
+      DMEM_SIZE => 128*1024,
 
       RISCV_ISA_C      => true,
       RISCV_ISA_M      => true,

@@ -1,73 +1,81 @@
 with Uart0;
-with Uart1;
 with Gnat_Exit;
 with Min;
+with Interfaces; use Interfaces;
+with Image_Store; use Image_Store;
+with Camera;
+with Comms;
 
 procedure Helios is
 
-    procedure Delay_Loop (Count : Natural) is
+    procedure Put_Byte (B : Byte) is
     begin
-        for I in 1 .. Count loop
-            null;
-        end loop;
-    end Delay_Loop;
+        Uart0.Put ("[");
+        Uart0.Put (Integer'Image (Natural (B)));
+        Uart0.Put ("] ");
+    end Put_Byte;
 
-    procedure Send_Command is
+    procedure Print_Image_Preview
+        (Buf        : Byte_Array;
+         Total_Len  : Natural;
+         Max_Bytes  : Natural := 96) is
+        Preview_Count : Natural := Total_Len;
     begin
-        while not Uart1.TX_Ready loop
-            null;
-        end loop;
-        Uart1.Write_TX (Character'Val (16#56#));
+        if Preview_Count > Max_Bytes then
+            Preview_Count := Max_Bytes;
+        end if;
 
-        while not Uart1.TX_Ready loop
-            null;
+        Uart0.Put ("IMAGE_PREVIEW ");
+        for I in 0 .. Preview_Count - 1 loop
+            Put_Byte (Buf (I));
         end loop;
-        Uart1.Write_TX (Character'Val (16#00#));
+        Uart0.Put (ASCII.CR & ASCII.LF);
+    end Print_Image_Preview;
 
-        while not Uart1.TX_Ready loop
-            null;
-        end loop;
-        Uart1.Write_TX (Character'Val (16#26#));
-
-        while not Uart1.TX_Ready loop
-            null;
-        end loop;
-        Uart1.Write_TX (Character'Val (16#00#));
-    end Send_Command;
-
-    procedure Send_Test_Byte is
-    begin
-        while not Uart1.TX_Ready loop
-            null;
-        end loop;
-        Uart1.Write_TX (Character'Val (16#55#));
-    end Send_Test_Byte;
+    Img_Len : Natural := 0;
+    Success : Boolean := False;
 
 begin
-    Uart0.Init (19200);
-    Uart1.Init (38400);
 
-    Uart0.Put ("Boot ");
+    Uart0.Init (19200);
+
+    Uart0.Put ("Boot");
+    Uart0.Put (ASCII.CR & ASCII.LF);
+
+    Camera.Init;
+
+    Uart0.Put ("CAMERA_CAPTURE_START");
+    Uart0.Put (ASCII.CR & ASCII.LF);
+
+    Camera.Capture_Image (Img_Len, Success);
+
+    if Success then
+        Uart0.Put ("CAPTURE_OK");
+        Uart0.Put (ASCII.CR & ASCII.LF);
+
+        Uart0.Put ("IMG_LEN=");
+        Uart0.Put (Integer'Image (Img_Len));
+        Uart0.Put (ASCII.CR & ASCII.LF);
+
+        Print_Image_Preview (Image_Buf, Img_Len, 96);
+
+        Uart0.Put ("COMMS_INIT");
+        Uart0.Put (ASCII.CR & ASCII.LF);
+        Comms.Init;
+
+        Uart0.Put ("COMMS_SEND_LOOP_START");
+        Uart0.Put (ASCII.CR & ASCII.LF);
+
+        -- IMPORTANT: after this, no more UART0 debug prints
+        Comms.Send_Image_Loop (Img_Len);
+
+    else
+        Uart0.Put ("CAPTURE_FAILED");
+        Uart0.Put (ASCII.CR & ASCII.LF);
+    end if;
 
     loop
-        Uart0.Put ("SEND ");
-
-        Send_Command;
-
-        for I in 1 .. 20_000_000 loop
-            if Uart1.RX_Ready then
-                declare
-                    B : Integer := Character'Pos (Uart1.Read_RX);
-                begin
-                    Uart0.Put ("RX:");
-                    Uart0.Put (Integer'Image (B));
-                    Uart0.Put (" ");
-                end;
-            end if;
-        end loop;
-
-        Uart0.Put ("| ");
-
-   end loop;
+        null;
+    end loop;
 
 end Helios;
