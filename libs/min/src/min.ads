@@ -2,4 +2,5 @@
 package Min is
     procedure Init;
     procedure Send_Test;
+    procedure Send_Image_Loop (Length : Natural);
 end Min;
