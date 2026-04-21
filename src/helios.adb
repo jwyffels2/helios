@@ -32,50 +32,76 @@ procedure Helios is
         Uart0.Put (ASCII.CR & ASCII.LF);
     end Print_Image_Preview;
 
-    Img_Len : Natural := 0;
-    Success : Boolean := False;
-
-begin
-
-    Uart0.Init (19200);
-
-    Uart0.Put ("Boot");
-    Uart0.Put (ASCII.CR & ASCII.LF);
-
-    Camera.Init;
-
-    Uart0.Put ("CAMERA_CAPTURE_START");
-    Uart0.Put (ASCII.CR & ASCII.LF);
-
-    Camera.Capture_Image (Img_Len, Success);
-
-    if Success then
-        Uart0.Put ("CAPTURE_OK");
+    procedure Do_Initialize is
+    begin
+        Uart0.Put ("INIT_START");
         Uart0.Put (ASCII.CR & ASCII.LF);
 
-        Uart0.Put ("IMG_LEN=");
-        Uart0.Put (Integer'Image (Img_Len));
-        Uart0.Put (ASCII.CR & ASCII.LF);
-
-        Print_Image_Preview (Image_Buf, Img_Len, 96);
-
-        Uart0.Put ("COMMS_INIT");
-        Uart0.Put (ASCII.CR & ASCII.LF);
+        Camera.Init;
         Comms.Init;
 
-        Uart0.Put ("COMMS_SEND_LOOP_START");
+        Uart0.Put ("INIT_OK");
+        Uart0.Put (ASCII.CR & ASCII.LF);
+    end Do_Initialize;
+
+    procedure Do_Capture is
+        Img_Len : Natural := 0;
+        Success : Boolean := False;
+    begin
+        Uart0.Put ("CAPTURE_START");
         Uart0.Put (ASCII.CR & ASCII.LF);
 
-        -- IMPORTANT: after this, no more UART0 debug prints
-        Comms.Send_Image_Loop (Img_Len);
+        Camera.Capture_Image (Img_Len, Success);
 
-    else
-        Uart0.Put ("CAPTURE_FAILED");
-        Uart0.Put (ASCII.CR & ASCII.LF);
-    end if;
+        if Success then
+            Uart0.Put ("CAPTURE_OK");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+
+            Uart0.Put ("IMG_LEN=");
+            Uart0.Put (Integer'Image (Img_Len));
+            Uart0.Put (ASCII.CR & ASCII.LF);
+
+            Print_Image_Preview (Image_Buf, Img_Len, 96);
+
+            Uart0.Put ("SEND_START");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+
+            -- For now send one image burst, not an infinite loop
+            Comms.Send_Image (Img_Len);
+
+            Uart0.Put ("SEND_DONE");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+        else
+            Uart0.Put ("CAPTURE_FAILED");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+        end if;
+    end Do_Capture;
+
+    Cmd : Character;
+
+begin
+    Uart0.Init (19200);
+
+    Uart0.Put ("BOOT_OK");
+    Uart0.Put (ASCII.CR & ASCII.LF);
+    Uart0.Put ("WAITING_FOR_COMMANDS");
+    Uart0.Put (ASCII.CR & ASCII.LF);
 
     loop
-        null;
+        Cmd := Uart0.Read_RX;
+
+        case Cmd is
+            when 'i' | 'I' =>
+                Do_Initialize;
+
+            when 'c' | 'C' =>
+                Do_Capture;
+
+            when others =>
+                Uart0.Put ("UNKNOWN_COMMAND");
+                Uart0.Put (ASCII.CR & ASCII.LF);
+        end case;
+
     end loop;
 
 end Helios;

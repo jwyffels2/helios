@@ -220,8 +220,6 @@ package body Camera is
         Success := False;
         Img_Len := 0;
 
-        Uart1.Flush_RX;
-
         Send_Stop_Frame;
         Read_Up_To (5, 20_000_000, Stop_Buf, Count);
 
@@ -300,6 +298,7 @@ package body Camera is
         end loop;
 
         Success := (Bytes_Read = Img_Len);
+
     end Capture_Image;
 
 end Camera;

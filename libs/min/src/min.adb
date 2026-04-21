@@ -30,4 +30,11 @@ package body Min is
         C_Send_Image_Loop (Interfaces.C.unsigned (Length));
     end Send_Image_Loop;
 
+    procedure Min_Glue_Send_Image_Once (Img_Len : Natural) with Import, Convention => C, External_Name => "min_glue_send_image_once";
+
+    procedure Send_Image_Once (Img_Len : Natural) is
+    begin
+        Min_Glue_Send_Image_Once (Img_Len);
+    end Send_Image_Once;
+
 end Min;

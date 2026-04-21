@@ -60,7 +60,7 @@ void min_glue_init(void) {
     min_init_context(&g_ctx, 0);
 }
 
-static void min_glue_send_image_once(uint32_t image_len) {
+void min_glue_send_image_once(uint32_t image_len) {
     static uint16_t image_id = 1;
 
     // ---- START ----
