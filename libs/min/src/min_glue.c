@@ -4,8 +4,9 @@
 #include <string.h>
 #include "min.h"
 
-// Exported by Ada package Image_Store
-extern uint8_t image_buf[];
+// The application exports image_buf from Ada Image_Store. Tests link this C
+// module without the application, so keep a weak fallback to satisfy the linker.
+uint8_t image_buf[1] __attribute__((weak));
 
 // Set this to your NEORV32 CPU clock (Hz). If unsure, keep 50 MHz for now.
 #ifndef NEORV32_CPU_CLK_HZ
