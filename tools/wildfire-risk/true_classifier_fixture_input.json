@@ -1,0 +1,21 @@
+{
+  "lat": 48.6411,
+  "long": -118.3751,
+  "date": "2026-03-22T18:00:00Z",
+  "elevation": 720,
+  "temperatureSurface": 14.6,
+  "relativeHumiditySurface": 24,
+  "dewPointSurface": -11.7,
+  "precipitation": 0,
+  "tmax": 18,
+  "tmin": 6,
+  "vegetationType": 4,
+  "vegetation": 46.279998779296875,
+  "pdsi": -3.6951563358306885,
+  "windU": 1.8054450694561441,
+  "windV": 2.395906530141879,
+  "surfacePressure": 843.3,
+  "cloudCover": 100,
+  "soilTemperatureSurface": 12.5,
+  "soilMoistureSurface": 0.18
+}

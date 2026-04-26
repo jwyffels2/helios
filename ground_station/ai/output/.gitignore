@@ -1,0 +1,4 @@
+# Keep the output directory in Git, but never commit generated model artifacts.
+# train_wildfire_model.py writes wildfire_model_python.json here during demos.
+*
+!.gitignore

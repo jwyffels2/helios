@@ -1,0 +1,16 @@
+{
+  "lat": 48.6411,
+  "long": -118.3751,
+  "date": "2026-03-22T18:00:00Z",
+  "temperatureSurface": 289.0,
+  "groundHeatFlux": -12.5,
+  "canopyWater": 0.045,
+  "vegetationType": 4,
+  "vegetation": 46.3,
+  "pdsi": -3.2,
+  "precipitation": 0.0,
+  "tmax": 18.0,
+  "tmin": 6.0,
+  "windU": 1.8,
+  "windV": 2.4
+}
