@@ -117,6 +117,7 @@ class FittedModel:
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse CLI options for dataset path, split policy, and model family."""
     parser = argparse.ArgumentParser(
         description="Train a Python wildfire model from tools/wildfire-risk generated data."
     )
@@ -150,6 +151,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def parse_number(value: Any) -> float | None:
+    """Return a finite float or None for missing/invalid inputs."""
     if value is None or value == "":
         return None
     try:
@@ -162,6 +164,7 @@ def parse_number(value: Any) -> float | None:
 
 
 def parse_date(value: Any) -> datetime:
+    """Parse ISO-like timestamps and normalize to UTC."""
     if isinstance(value, str):
         text = value.replace("Z", "+00:00")
         try:
@@ -175,10 +178,12 @@ def parse_date(value: Any) -> datetime:
 
 
 def day_of_year(date_value: datetime) -> int:
+    """UTC day-of-year for seasonal feature encoding."""
     return int(date_value.strftime("%j"))
 
 
 def pick(sample: dict[str, Any], *keys: str) -> float | None:
+    """Return the first finite numeric value among candidate keys."""
     for key in keys:
         number = parse_number(sample.get(key))
         if number is not None:
@@ -187,6 +192,7 @@ def pick(sample: dict[str, Any], *keys: str) -> float | None:
 
 
 def build_feature_map(sample: dict[str, Any]) -> dict[str, float | None]:
+    """Build the canonical feature dictionary from a raw sample record."""
     feature_map = {
         "lat": pick(sample, "lat"),
         "long": pick(sample, "long"),
@@ -231,6 +237,7 @@ def build_feature_map(sample: dict[str, Any]) -> dict[str, float | None]:
 
 
 def load_records(dataset_path: Path, allow_partial: bool) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Load dataset JSON and convert samples into a typed feature DataFrame."""
     dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
     status = dataset.get("status")
     if not allow_partial and status != "complete":
@@ -257,10 +264,12 @@ def load_records(dataset_path: Path, allow_partial: bool) -> tuple[pd.DataFrame,
 
 
 def region_bucket(row: pd.Series, geo_cell_degrees: float) -> str:
+    """Map coordinates to coarse geo buckets for held-out-region testing."""
     return f"{math.floor(row['lat'] / geo_cell_degrees)}:{math.floor(row['long'] / geo_cell_degrees)}"
 
 
 def split_time_and_geography(records: pd.DataFrame, args: argparse.Namespace) -> Split:
+    """Split into train/validation/test by time plus held-out geographic cells."""
     sorted_records = records.sort_values("timestamp").reset_index(drop=True)
     if len(sorted_records) < 3:
         raise SystemExit("Need at least 3 samples to create train/validation/test splits.")
@@ -294,6 +303,7 @@ def split_time_and_geography(records: pd.DataFrame, args: argparse.Namespace) ->
 
 
 def impute_and_normalize(split: Split) -> tuple[Split, dict[str, float], dict[str, dict[str, float]]]:
+    """Fit imputation + normalization on train, then apply to all splits."""
     imputation_means: dict[str, float] = {}
     normalization: dict[str, dict[str, float]] = {}
 
@@ -319,10 +329,12 @@ def impute_and_normalize(split: Split) -> tuple[Split, dict[str, float], dict[st
 
 
 def matrix(frame: pd.DataFrame) -> np.ndarray:
+    """Extract feature matrix in canonical feature order."""
     return frame[FEATURE_NAMES].to_numpy(dtype=float)
 
 
 def expanded_matrix(x_values: np.ndarray) -> tuple[np.ndarray, list[str]]:
+    """Build manual nonlinear expansion (squares + selected interactions)."""
     parts = [x_values]
     names = [f"z:{name}" for name in FEATURE_NAMES]
 
@@ -342,6 +354,7 @@ def expanded_matrix(x_values: np.ndarray) -> tuple[np.ndarray, list[str]]:
 
 
 def transform(x_values: np.ndarray, mode: str) -> tuple[np.ndarray, list[str]]:
+    """Apply the requested feature transformation mode."""
     if mode == "linear":
         return x_values, [f"z:{name}" for name in FEATURE_NAMES]
     if mode == "expanded":
@@ -350,10 +363,12 @@ def transform(x_values: np.ndarray, mode: str) -> tuple[np.ndarray, list[str]]:
 
 
 def sigmoid(logits: np.ndarray) -> np.ndarray:
+    """Numerically stable sigmoid for vector logits."""
     return 1.0 / (1.0 + np.exp(-np.clip(logits, -40, 40)))
 
 
 def train_logistic(x_values: np.ndarray, y_values: np.ndarray, epochs: int, learning_rate: float, l2_penalty: float) -> tuple[np.ndarray, float]:
+    """Train logistic regression with batch gradient descent + L2 penalty."""
     weights = np.zeros(x_values.shape[1], dtype=float)
     bias = 0.0
     sample_count = len(y_values)
@@ -371,6 +386,7 @@ def train_logistic(x_values: np.ndarray, y_values: np.ndarray, epochs: int, lear
 
 
 def auc_score(y_values: np.ndarray, probabilities: np.ndarray) -> float | None:
+    """Compute ROC AUC with tie-aware rank formulation."""
     positives = int(y_values.sum())
     negatives = len(y_values) - positives
     if positives == 0 or negatives == 0:
@@ -395,21 +411,25 @@ def auc_score(y_values: np.ndarray, probabilities: np.ndarray) -> float | None:
 
 
 def safe_sklearn_auc(y_values: np.ndarray, probabilities: np.ndarray) -> float | None:
+    """Delegate AUC to sklearn when both classes are present."""
     if len(np.unique(y_values)) < 2:
         return None
     return float(roc_auc_score(y_values, probabilities))
 
 
 def log_loss(y_values: np.ndarray, probabilities: np.ndarray) -> float:
+    """Compute mean cross-entropy."""
     clipped = np.clip(probabilities, 1e-9, 1 - 1e-9)
     return float(-(y_values * np.log(clipped) + (1 - y_values) * np.log(1 - clipped)).mean())
 
 
 def brier_score(y_values: np.ndarray, probabilities: np.ndarray) -> float:
+    """Compute mean squared probability error."""
     return float(np.mean((probabilities - y_values) ** 2))
 
 
 def confusion_metrics(y_values: np.ndarray, probabilities: np.ndarray, threshold: float = 0.5) -> dict[str, float | int]:
+    """Compute thresholded confusion-matrix metrics."""
     predictions = probabilities >= threshold
     labels = y_values == 1
     true_positive = int(np.logical_and(predictions, labels).sum())
@@ -431,6 +451,7 @@ def confusion_metrics(y_values: np.ndarray, probabilities: np.ndarray, threshold
 
 
 def fit_platt(logits: np.ndarray, y_values: np.ndarray) -> dict[str, Any]:
+    """Fit Platt scaling on validation logits (or identity fallback)."""
     if len(np.unique(y_values)) < 2:
         return {"type": "identity", "status": "validation_split_has_one_class", "scale": 1.0, "offset": 0.0}
 
@@ -447,12 +468,14 @@ def fit_platt(logits: np.ndarray, y_values: np.ndarray) -> dict[str, Any]:
 
 
 def apply_calibration(logits: np.ndarray, calibration: dict[str, Any] | None) -> np.ndarray:
+    """Apply learned calibration parameters to logits."""
     if not calibration or calibration.get("type") == "identity":
         return sigmoid(logits)
     return sigmoid((float(calibration["scale"]) * logits) + float(calibration["offset"]))
 
 
 def summarize(y_values: np.ndarray, probabilities: np.ndarray) -> dict[str, Any]:
+    """Bundle metrics for one split/probability set."""
     return {
         **confusion_metrics(y_values, probabilities),
         "auc": auc_score(y_values, probabilities),
@@ -462,6 +485,7 @@ def summarize(y_values: np.ndarray, probabilities: np.ndarray) -> dict[str, Any]
 
 
 def fit_candidate(mode: str, split: Split, args: argparse.Namespace) -> FittedModel:
+    """Fit a NumPy logistic candidate and evaluate raw/calibrated metrics."""
     x_train, derived_names = transform(matrix(split.training), mode)
     x_validation, _ = transform(matrix(split.validation), mode)
     x_test, _ = transform(matrix(split.test), mode)
@@ -498,6 +522,7 @@ def fit_candidate(mode: str, split: Split, args: argparse.Namespace) -> FittedMo
 
 
 def summarize_probabilities(y_values: np.ndarray, probabilities: np.ndarray, use_sklearn_auc: bool = False) -> dict[str, Any]:
+    """Metric helper for sklearn estimator probabilities."""
     return {
         **confusion_metrics(y_values, probabilities),
         "auc": safe_sklearn_auc(y_values, probabilities) if use_sklearn_auc else auc_score(y_values, probabilities),
@@ -507,6 +532,7 @@ def summarize_probabilities(y_values: np.ndarray, probabilities: np.ndarray, use
 
 
 def fit_sklearn_candidate(mode: str, split: Split, args: argparse.Namespace) -> FittedModel:
+    """Fit and evaluate one sklearn candidate model configuration."""
     if not SKLEARN_AVAILABLE:
         raise SystemExit("scikit-learn is not installed. Run `poetry add scikit-learn joblib` inside ground_station/ai.")
 
@@ -612,6 +638,7 @@ def fit_sklearn_candidate(mode: str, split: Split, args: argparse.Namespace) -> 
 
 
 def choose_model(candidates: list[FittedModel]) -> FittedModel:
+    """Choose best candidate by calibrated validation log loss, then AUC."""
     def key(candidate: FittedModel) -> tuple[float, float]:
         log_loss_value = candidate.validation["calibrated"]["logLoss"]
         auc_value = candidate.validation["calibrated"]["auc"]
@@ -621,6 +648,7 @@ def choose_model(candidates: list[FittedModel]) -> FittedModel:
 
 
 def to_jsonable(value: Any) -> Any:
+    """Convert NumPy-heavy structures into JSON-serializable Python types."""
     if isinstance(value, np.ndarray):
         return value.tolist()
     if isinstance(value, np.generic):
@@ -633,10 +661,12 @@ def to_jsonable(value: Any) -> Any:
 
 
 def format_metric(value: Any) -> str:
+    """Format metric for terminal output."""
     return "n/a" if value is None else f"{float(value):.4f}"
 
 
 def print_metrics(label: str, model: FittedModel) -> None:
+    """Print calibrated metric summaries for quick candidate comparison."""
     validation = model.validation["calibrated"]
     test = model.test["calibrated"]
     print(f"{label}: {model.mode}")
@@ -651,6 +681,7 @@ def print_metrics(label: str, model: FittedModel) -> None:
 
 
 def main() -> None:
+    """Train selected candidates, pick the best, and write model artifact."""
     args = parse_args()
     dataset_path = Path(args.input).resolve()
     output_path = Path(args.output).resolve()

@@ -15,6 +15,7 @@ const {
 } = require("./true_classifier_runtime");
 
 function parseArguments(argv) {
+  // Minimal CLI for regression checks in CI/local smoke runs.
   const args = {
     model: path.join(__dirname, "output", "true_classifier_model.json"),
     fixture: path.join(__dirname, "true_classifier_fixture_input.json"),
@@ -39,12 +40,15 @@ function parseArguments(argv) {
 }
 
 function ensureProbabilityRange(value, label) {
+  // Guard against NaN/out-of-range values that usually indicate a broken model
+  // artifact or a math issue in the inference path.
   if (!Number.isFinite(value) || value < 0 || value > 1) {
     throw new Error(`${label} must be a finite probability in [0, 1].`);
   }
 }
 
 function main() {
+  // Run a deterministic fixture through the scorer and assert invariants.
   const args = parseArguments(process.argv.slice(2));
   const model = loadJson(args.model);
   const fixture = loadJson(args.fixture);

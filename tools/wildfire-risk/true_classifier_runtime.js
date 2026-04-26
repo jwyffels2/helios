@@ -18,6 +18,9 @@ const {
 } = require("./true_classifier_common");
 
 function scoreTrueClassifierInput(inputRecord, model, fallbackDate) {
+  // Shared inference pipeline:
+  // 1) construct feature map, 2) impute missing fields, 3) normalize to model
+  // space, 4) compute raw score, 5) apply probability calibration.
   const featureNames = Array.isArray(model.features) ? model.features : TRUE_FEATURE_NAMES;
   const rawFeatureMap = buildTrueClassifierFeatureMap(inputRecord, fallbackDate);
   const { completedFeatureMap, missingFeatures } = imputeFeatureMap(

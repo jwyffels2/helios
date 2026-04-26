@@ -5,6 +5,7 @@
 // inference so every stage builds the same numeric feature vector.
 
 const {
+  dayOfYear,
   parseDateValue,
   parseNumber,
 } = require("./common");
@@ -43,13 +44,10 @@ const TRUE_FEATURE_NAMES = [
   "dayOfYearCos",
 ];
 
-function dayOfYear(date) {
-  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0));
-  const diff = date - start;
-  return Math.floor(diff / 86400000);
-}
-
 function buildTrueClassifierFeatureMap(record, fallbackDate) {
+  // Build a full raw feature map from mixed-source records.
+  // The function accepts both canonical names and known alias keys so dataset
+  // generation and live inference can share one normalization path.
   const featureMap = {
     lat: parseNumber(record.lat),
     long: parseNumber(record.long),
@@ -86,6 +84,8 @@ function buildTrueClassifierFeatureMap(record, fallbackDate) {
   const angle = (2 * Math.PI * doy) / 365.25;
 
   if (featureMap.windU !== null && featureMap.windV !== null) {
+    // Derived wind speed is intentionally computed from components so training
+    // and inference remain consistent regardless of original API representation.
     featureMap.windSpeed = Math.sqrt((featureMap.windU ** 2) + (featureMap.windV ** 2));
   } else {
     featureMap.windSpeed = null;

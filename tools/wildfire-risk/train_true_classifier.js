@@ -27,6 +27,7 @@ const {
 } = require("./true_classifier_common");
 
 function parseArguments(argv) {
+  // Exposes split strategy and optimization hyperparameters for experiments.
   const args = {
     input: path.join(__dirname, "output", "true_classifier_dataset.json"),
     output: path.join(__dirname, "output", "true_classifier_model.json"),
@@ -82,12 +83,15 @@ function formatMetric(value) {
 }
 
 function regionBucket(record, geoCellDegrees) {
+  // Coarse geo-grid bucket used for held-out-region test selection.
   const latBucket = Math.floor(record.features.lat / geoCellDegrees);
   const longBucket = Math.floor(record.features.long / geoCellDegrees);
   return `${latBucket}:${longBucket}`;
 }
 
 function splitTimeAndGeography(records, options) {
+  // Build a harder evaluation split:
+  // latest samples from held-out geo buckets become the test set.
   const sorted = [...records].sort((left, right) => left.timestamp - right.timestamp);
   if (sorted.length < 3) {
     throw new Error("Need at least 3 samples to create train/validation/test splits.");
@@ -141,6 +145,7 @@ function splitTimeAndGeography(records, options) {
 }
 
 function scoreRecords(records, model) {
+  // Compute raw logits before calibration.
   return records.map((record) => ({
     target: record.target,
     logit: predictLogit(record.vector, model),
@@ -148,6 +153,7 @@ function scoreRecords(records, model) {
 }
 
 function applyCalibration(scoredRecords, calibration) {
+  // Apply Platt/identity calibration to logits.
   return scoredRecords.map((record) => ({
     target: record.target,
     probability: calibrateLogit(record.logit, calibration),
@@ -155,6 +161,7 @@ function applyCalibration(scoredRecords, calibration) {
 }
 
 function logitsToRawProbabilities(scoredRecords) {
+  // Convert logits via plain sigmoid for "raw" metric reporting.
   return scoredRecords.map((record) => ({
     target: record.target,
     probability: calibrateLogit(record.logit, null),
@@ -162,6 +169,7 @@ function logitsToRawProbabilities(scoredRecords) {
 }
 
 function summarizeMetrics(scoredRecords) {
+  // Common metric block used for validation/test and raw/calibrated views.
   return {
     ...confusionMetrics(scoredRecords, 0.5),
     auc: areaUnderCurve(scoredRecords),
@@ -171,6 +179,8 @@ function summarizeMetrics(scoredRecords) {
 }
 
 function main() {
+  // Training flow:
+  // load dataset -> split -> impute/normalize -> train -> calibrate -> export.
   const args = parseArguments(process.argv.slice(2));
   const dataset = loadJson(args.input);
   if (!args.allowPartial && dataset.status !== "complete") {
@@ -272,6 +282,7 @@ function main() {
 
   saveJson(args.output, modelDocument);
 
+  // Emit concise metrics for quick run-to-run comparison.
   console.log(`Saved model to ${path.resolve(args.output)}`);
   console.log(`Rows: train=${training.length} validation=${validation.length} test=${test.length}`);
   console.log(`Calibration: ${calibration.type} (${calibration.status})`);

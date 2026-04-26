@@ -7,6 +7,8 @@
 
 const path = require("path");
 const {
+  dayOfYear,
+  haversineKm,
   loadCsv,
   parseDateValue,
   parseNumber,
@@ -14,28 +16,14 @@ const {
 
 const DEFAULT_CONTEXT_CSV = "c:\\Users\\Leonard\\Desktop\\firms_ee_feature_join.csv";
 
-function dayOfYear(date) {
-  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0));
-  const diff = date - start;
-  return Math.floor(diff / 86400000);
-}
-
 function circularDayDifference(left, right) {
+  // Wrap around year boundaries so Jan 1 and Dec 31 stay close seasonally.
   const diff = Math.abs(left - right);
   return Math.min(diff, 366 - diff);
 }
 
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const toRadians = (value) => (value * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 function normalizeContextRow(row) {
+  // Convert CSV row into a typed context record or drop invalid rows.
   const date = parseDateValue(row.date);
   const lat = parseNumber(row.lat);
   const long = parseNumber(row.long);
@@ -62,6 +50,7 @@ function normalizeContextRow(row) {
 }
 
 function buildContextIndex(csvPath = DEFAULT_CONTEXT_CSV) {
+  // Index context rows by day-of-year to speed up seasonal nearest search.
   const rows = loadCsv(path.resolve(csvPath))
     .map(normalizeContextRow)
     .filter(Boolean);
@@ -82,6 +71,8 @@ function buildContextIndex(csvPath = DEFAULT_CONTEXT_CSV) {
 }
 
 function lookupNearestContext(index, candidate, options = {}) {
+  // Score candidates by geographic distance + seasonal day penalty to find the
+  // closest context row for vegetation/drought fields.
   const dayWindow = options.dayWindow ?? 14;
   const dayPenaltyKm = options.dayPenaltyKm ?? 5;
   const date = parseDateValue(candidate.date) ?? new Date();
@@ -112,6 +103,7 @@ function lookupNearestContext(index, candidate, options = {}) {
   }
 
   if (!best) {
+    // Fallback: if no row found in the seasonal window, use global nearest.
     for (const row of index.rows) {
       const distanceKm = haversineKm(lat, long, row.lat, row.long);
       if (distanceKm < bestScore) {
@@ -134,6 +126,8 @@ function lookupNearestContext(index, candidate, options = {}) {
       };
 
   if (options.includeWeatherProxies) {
+    // Optional compatibility mode for dataset generation: carry additional
+    // weather-like proxy fields from nearest context row.
     Object.assign(result, best
       ? {
           temperatureSurface: best.temperatureSurface,

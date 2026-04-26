@@ -7,6 +7,8 @@
 
 const path = require("path");
 const {
+  dayOfYear,
+  haversineKm,
   loadCsv,
   parseDateValue,
   parseNumber,
@@ -24,6 +26,8 @@ const {
 const FEATURE_SCHEMA_VERSION = 2;
 
 function parseArguments(argv) {
+  // Dataset-generation knobs:
+  // sample sizes, negative mining, API retry behavior, and checkpoint cadence.
   const args = {
     csv: "c:\\Users\\Leonard\\Desktop\\firms_ee_feature_join.csv",
     output: path.join(__dirname, "output", "true_classifier_dataset.json"),
@@ -101,6 +105,7 @@ function parseArguments(argv) {
 }
 
 function createRng(seed) {
+  // Deterministic RNG so dataset sampling is reproducible from the same seed.
   let state = seed >>> 0;
   return () => {
     state = (1664525 * state + 1013904223) >>> 0;
@@ -109,6 +114,7 @@ function createRng(seed) {
 }
 
 function sampleWithoutReplacement(items, count, rng) {
+  // Fisher-Yates shuffle then slice; avoids duplicate picks.
   const cloned = [...items];
   for (let index = cloned.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(rng() * (index + 1));
@@ -119,20 +125,12 @@ function sampleWithoutReplacement(items, count, rng) {
 }
 
 function toDateKey(date) {
+  // Day-level key used in positive-index and duplicate checks.
   return date.toISOString().slice(0, 10);
 }
 
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const toRadians = (value) => (value * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2
-    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 function buildPositiveIndex(records) {
+  // Index known positives by day for fast time-window proximity checks.
   const byDate = new Map();
 
   for (const record of records) {
@@ -147,6 +145,7 @@ function buildPositiveIndex(records) {
 }
 
 function isFarFromPositives(candidate, positiveIndex, timeBufferDays, minDistanceKm) {
+  // Reject negative candidates too close in space/time to known positives.
   for (let dayOffset = -timeBufferDays; dayOffset <= timeBufferDays; dayOffset += 1) {
     const date = new Date(candidate.date);
     date.setUTCDate(date.getUTCDate() + dayOffset);
@@ -171,6 +170,8 @@ function clamp(value, minimum, maximum) {
 }
 
 function generateNegativeCandidate(anchor, bounds, rng) {
+  // Sample nearby coordinate/date around a positive anchor, then clamp to
+  // dataset bounds so negatives stay in-distribution.
   const angle = rng() * 2 * Math.PI;
   const radiusKm = 30 + (rng() * 170);
   const latDelta = (radiusKm / 111) * Math.cos(angle);
@@ -187,13 +188,8 @@ function generateNegativeCandidate(anchor, bounds, rng) {
   };
 }
 
-function dayOfYear(date) {
-  const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0));
-  const diff = date - start;
-  return Math.floor(diff / 86400000);
-}
-
 function normalizeUnit(value, minimum, maximum) {
+  // Normalizes heuristic factors to [0, 1] for weighted hard-negative scoring.
   if (!Number.isFinite(value) || maximum <= minimum) {
     return 0.5;
   }
@@ -205,6 +201,7 @@ function firstFinite(...values) {
 }
 
 function seasonalFireScore(date) {
+  // Lightweight seasonality prior used only for hard-negative ranking.
   const doy = dayOfYear(date);
   if (doy >= 150 && doy <= 280) {
     return 1;
@@ -216,6 +213,8 @@ function seasonalFireScore(date) {
 }
 
 function hardNegativeScore(candidate) {
+  // Higher score means "looks more fire-like" while still being labeled as
+  // non-fire background, forcing the model to learn harder boundaries.
   const temperature = firstFinite(candidate.temperatureSurface, candidate.tmax, candidate.tmin);
   const precipitation = firstFinite(candidate.precipitation);
   const pdsi = firstFinite(candidate.pdsi);
@@ -244,12 +243,15 @@ function hardNegativeScore(candidate) {
 }
 
 function negativeCandidateKey(candidate) {
+  // Rounded key prevents near-duplicate negatives in the candidate pool.
   const lat = Number(candidate.lat).toFixed(4);
   const long = Number(candidate.long).toFixed(4);
   return `${toDateKey(candidate.date)}|${lat}|${long}`;
 }
 
 function generateNegativeCandidatePool(count, positiveCandidates, bounds, rng, positiveIndex, args, contextIndex) {
+  // Generate a de-duplicated pool of valid background candidates and attach
+  // context-driven hardness scores used during selection.
   const candidates = [];
   const seenKeys = new Set();
   let attempts = 0;
@@ -286,6 +288,7 @@ function generateNegativeCandidatePool(count, positiveCandidates, bounds, rng, p
 }
 
 function selectNegatives(candidatePool, args, rng) {
+  // Choose top-scoring hard negatives + random remainder.
   const hardNegativeCount = Math.min(
     args.negatives,
     Math.max(0, Math.round(args.negatives * clamp(args.hardNegativeRatio, 0, 1)))
@@ -301,6 +304,7 @@ function selectNegatives(candidatePool, args, rng) {
 }
 
 async function enrichSample(sample, label) {
+  // Fetch archive weather/context features for the sample coordinate/date.
   const weather = await fetchOpenMeteoArchive(sample.lat, sample.long, sample.date.toISOString(), sample.requestOptions);
   return {
     label,
@@ -317,6 +321,7 @@ async function enrichSample(sample, label) {
 }
 
 function sampleKey(sample) {
+  // Stable dedupe key for resume/checkpoint behavior.
   const lat = Number(sample.lat).toFixed(6);
   const long = Number(sample.long).toFixed(6);
   const date = new Date(sample.date).toISOString();
@@ -324,6 +329,7 @@ function sampleKey(sample) {
 }
 
 function buildGenerationParameters(args, contextIndex) {
+  // Persisted in output so resume logic can verify compatible settings.
   return {
     featureSchemaVersion: FEATURE_SCHEMA_VERSION,
     positives: args.positives,
@@ -338,6 +344,7 @@ function buildGenerationParameters(args, contextIndex) {
 }
 
 function progressSummary(samples) {
+  // Progress block used in checkpoint output.
   const positiveCount = samples.filter((sample) => sample.label === 1).length;
   const negativeCount = samples.length - positiveCount;
   return {
@@ -348,6 +355,7 @@ function progressSummary(samples) {
 }
 
 function saveProgressDocument(args, contextIndex, samples, status, note = null) {
+  // Write checkpoint/final dataset artifact.
   const document = {
     datasetType: "historical_fire_vs_background",
     createdAt: new Date().toISOString(),
@@ -363,6 +371,7 @@ function saveProgressDocument(args, contextIndex, samples, status, note = null) 
 }
 
 function generationParametersMatch(existingDocument, args, contextIndex) {
+  // Resume only when key generation parameters are identical.
   const existing = existingDocument?.generationParameters ?? {};
   const current = buildGenerationParameters(args, contextIndex);
 
@@ -379,6 +388,8 @@ function generationParametersMatch(existingDocument, args, contextIndex) {
 }
 
 async function main() {
+  // End-to-end dataset generation:
+  // collect positives, synthesize negatives, enrich with weather, checkpoint.
   const args = parseArguments(process.argv.slice(2));
   const rng = createRng(args.seed);
   const rawRows = loadCsv(args.csv);

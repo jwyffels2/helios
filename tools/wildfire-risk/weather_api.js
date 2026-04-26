@@ -13,6 +13,7 @@ const FORECAST_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 let nextRequestAllowedAt = 0;
 
 function toIsoHourString(value) {
+  // Open-Meteo hourly timestamps are usually naive; normalize to explicit UTC.
   if (!value) {
     return null;
   }
@@ -25,12 +26,14 @@ function firstValue(array) {
 }
 
 function dateStringDaysBefore(date, daysBefore) {
+  // Archive API expects YYYY-MM-DD windows.
   const copy = new Date(date);
   copy.setUTCDate(copy.getUTCDate() - daysBefore);
   return copy.toISOString().slice(0, 10);
 }
 
 function windComponentsFromSpeedAndDirection(speed, directionDegrees) {
+  // Convert speed + heading into vector components used by the model.
   if (!Number.isFinite(speed) || !Number.isFinite(directionDegrees)) {
     return { windU: null, windV: null };
   }
@@ -43,6 +46,7 @@ function windComponentsFromSpeedAndDirection(speed, directionDegrees) {
 }
 
 function finiteValues(values) {
+  // Aggregates below ignore null/NaN API entries.
   return values.filter((value) => Number.isFinite(value));
 }
 
@@ -71,6 +75,7 @@ function maximum(values) {
 }
 
 function nearestHourlyIndex(times, targetDate) {
+  // Choose the hourly row nearest to the requested timestamp.
   if (!Array.isArray(times) || times.length === 0) {
     return -1;
   }
@@ -92,6 +97,7 @@ function nearestHourlyIndex(times, targetDate) {
 }
 
 function hourlyWindowValues(hourly, fieldName, targetDate, hoursBack) {
+  // Slice values in (target-hoursBack, target] for lagged aggregates.
   const times = hourly.time;
   const values = hourly[fieldName];
   if (!Array.isArray(times) || !Array.isArray(values)) {
@@ -113,6 +119,7 @@ function hourlyWindowValues(hourly, fieldName, targetDate, hoursBack) {
 }
 
 function dailyValueForDate(daily, fieldName, targetDate) {
+  // Prefer same-day daily aggregate, otherwise fall back to first available.
   const times = daily?.time;
   const values = daily?.[fieldName];
   if (!Array.isArray(times) || !Array.isArray(values)) {
@@ -125,6 +132,7 @@ function dailyValueForDate(daily, fieldName, targetDate) {
 }
 
 function laggedWeatherFeatures(hourly, targetDate) {
+  // Build the temporal-context features used by the true classifier.
   const temperature24h = hourlyWindowValues(hourly, "temperature_2m", targetDate, 24);
   const temperature72h = hourlyWindowValues(hourly, "temperature_2m", targetDate, 72);
   const humidity24h = hourlyWindowValues(hourly, "relative_humidity_2m", targetDate, 24);
@@ -161,11 +169,13 @@ function sleep(milliseconds) {
 }
 
 function buildCachePath(cacheKey, url) {
+  // Cache key includes URL hash so query changes produce distinct entries.
   const hash = crypto.createHash("sha1").update(url.toString()).digest("hex");
   return path.join(DEFAULT_CACHE_DIR, `${cacheKey}-${hash}.json`);
 }
 
 function readCache(cachePath, maxAgeMs = Number.POSITIVE_INFINITY) {
+  // Returns null when cache is missing, invalid, or stale.
   if (!fs.existsSync(cachePath)) {
     return null;
   }
@@ -185,6 +195,7 @@ function readCache(cachePath, maxAgeMs = Number.POSITIVE_INFINITY) {
 }
 
 function writeCache(cachePath, url, payload) {
+  // Persist response payload with fetch timestamp for freshness checks.
   ensureDirectoryExists(path.dirname(cachePath));
   fs.writeFileSync(cachePath, `${JSON.stringify({
     cachedAt: new Date().toISOString(),
@@ -194,6 +205,8 @@ function writeCache(cachePath, url, payload) {
 }
 
 async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFINITY, requestOptions = {}) {
+  // Shared network fetch wrapper:
+  // cache-first read, then retried fetch with optional throttling/backoff.
   const cachePath = buildCachePath(cacheKey, url);
   const cachedPayload = readCache(cachePath, maxAgeMs);
   if (cachedPayload) {
@@ -246,6 +259,7 @@ async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFI
 }
 
 async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOptions = {}) {
+  // Historical query used during dataset generation.
   const targetDate = new Date(isoDateTime);
   const dateString = targetDate.toISOString().slice(0, 10);
   const url = new URL("https://archive-api.open-meteo.com/v1/archive");
@@ -304,6 +318,7 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOp
 }
 
 async function fetchOpenMeteoForecast(latitude, longitude) {
+  // Near-real-time forecast/current query used for live and batch inference.
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
@@ -347,6 +362,7 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
 }
 
 function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, dateOverride) {
+  // Map forecast payload to the canonical true-classifier input schema.
   const current = payload.current ?? {};
   const daily = payload.daily ?? {};
   const targetDate = new Date(dateOverride ?? (current.time ? `${current.time}Z` : null) ?? new Date().toISOString());

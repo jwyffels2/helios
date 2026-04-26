@@ -5,6 +5,7 @@
 // weather data for each row, ranks the results, and writes CSV/JSON outputs for
 // presentation or downstream review.
 
+const fs = require("fs");
 const path = require("path");
 const {
   loadCsv,
@@ -27,13 +28,18 @@ const {
 } = require("./true_classifier_runtime");
 
 function parseArguments(argv) {
+  // CLI options support both programmatic exports (JSON/CSV) and presentation
+  // artifacts (text summary + globe HTML).
   const args = {
     model: path.join(__dirname, "output", "true_classifier_model.json"),
     input: null,
     outputJson: null,
     outputCsv: null,
+    outputTxt: path.join(__dirname, "output", "potential_wildfires.txt"),
+    outputHtml: path.join(__dirname, "output", "potential_wildfires_globe.html"),
     sourceFile: null,
     contextCsv: DEFAULT_CONTEXT_CSV,
+    potentialThreshold: 0.5,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -51,11 +57,20 @@ function parseArguments(argv) {
     } else if (token === "--output-csv") {
       args.outputCsv = argv[index + 1];
       index += 1;
+    } else if (token === "--output-txt") {
+      args.outputTxt = argv[index + 1];
+      index += 1;
+    } else if (token === "--output-html") {
+      args.outputHtml = argv[index + 1];
+      index += 1;
     } else if (token === "--source-file") {
       args.sourceFile = argv[index + 1];
       index += 1;
     } else if (token === "--context-csv") {
       args.contextCsv = argv[index + 1];
+      index += 1;
+    } else if (token === "--potential-threshold") {
+      args.potentialThreshold = parseNumber(argv[index + 1]);
       index += 1;
     }
   }
@@ -63,11 +78,15 @@ function parseArguments(argv) {
   if (!args.input) {
     throw new Error("--input is required.");
   }
+  if (!Number.isFinite(args.potentialThreshold) || args.potentialThreshold < 0 || args.potentialThreshold > 1) {
+    throw new Error("--potential-threshold must be a number between 0 and 1.");
+  }
 
   return args;
 }
 
 function normalizeBatchRow(row, index) {
+  // Canonicalize lat/long/date/id fields from flexible CSV headers.
   const latitude = parseNumber(row.lat ?? row.latitude);
   const longitude = parseNumber(row.long ?? row.lon ?? row.longitude);
 
@@ -84,6 +103,7 @@ function normalizeBatchRow(row, index) {
 }
 
 async function loadWeatherPayload(args, latitude, longitude) {
+  // Optional shared replay payload for offline runs; otherwise query live.
   if (args.sourceFile) {
     return loadJson(args.sourceFile);
   }
@@ -92,6 +112,7 @@ async function loadWeatherPayload(args, latitude, longitude) {
 }
 
 async function scoreRow(row, args, model, contextIndex) {
+  // Score one batch row end-to-end and keep diagnostics for traceability.
   const weatherPayload = await loadWeatherPayload(args, row.lat, row.long);
   const apiMappedInput = mapForecastPayloadToTrueClassifierInput(
     weatherPayload,
@@ -122,6 +143,7 @@ async function scoreRow(row, args, model, contextIndex) {
 }
 
 function printSummary(results) {
+  // Terminal-friendly top-N summary for quick sanity checks.
   const topResults = results.slice(0, 10);
   topResults.forEach((result, index) => {
     console.log(
@@ -130,7 +152,131 @@ function printSummary(results) {
   });
 }
 
+function selectPotentialWildfires(results, threshold) {
+  return results.filter((result) => result.wildfireProbability >= threshold);
+}
+
+function printPotentialWildfireSummary(results, threshold) {
+  // Print locations that cross the user-defined risk threshold.
+  const potentialWildfires = selectPotentialWildfires(results, threshold);
+  console.log(`Potential wildfire threshold: ${threshold.toFixed(2)}`);
+  if (potentialWildfires.length === 0) {
+    console.log("No potential wildfires exceeded the configured threshold.");
+    return potentialWildfires;
+  }
+
+  potentialWildfires.forEach((result, index) => {
+    console.log(
+      `Potential ${index + 1}: (${result.lat.toFixed(6)}, ${result.long.toFixed(6)}) risk=${result.wildfireProbability.toFixed(4)} id=${result.id}`
+    );
+  });
+  return potentialWildfires;
+}
+
+function writePotentialWildfiresText(outputPath, potentialWildfires, threshold) {
+  // Persist a lightweight text report for sharing/logging.
+  const absolutePath = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+
+  const lines = [
+    `Potential wildfire threshold: ${threshold.toFixed(2)}`,
+    `Potential wildfire count: ${potentialWildfires.length}`,
+    "",
+  ];
+
+  potentialWildfires.forEach((result, index) => {
+    lines.push(
+      `${index + 1}. lat=${result.lat.toFixed(6)}, long=${result.long.toFixed(6)}, risk=${result.wildfireProbability.toFixed(4)}, id=${result.id}, date=${result.date}`
+    );
+  });
+
+  fs.writeFileSync(absolutePath, `${lines.join("\n")}\n`, "utf8");
+  return absolutePath;
+}
+
+function escapeInlineJson(value) {
+  // Prevent raw "<" characters from being interpreted as HTML/script tags.
+  return JSON.stringify(value).replace(/</g, "\\u003c");
+}
+
+function writePotentialWildfiresGlobeHtml(outputPath, results, potentialWildfires, threshold) {
+  // Write a self-contained Plotly globe page with risk-scaled markers.
+  const absolutePath = path.resolve(outputPath);
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+
+  const mapPoints = potentialWildfires.length > 0 ? potentialWildfires : results.slice(0, 200);
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Potential Wildfires Globe</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #0b1020; color: #f2f4f8; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    h1 { margin: 0 0 8px; font-size: 22px; }
+    .meta { margin-bottom: 12px; color: #c8d1dc; }
+    #globe { width: 100%; height: 76vh; min-height: 520px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Potential Wildfires Globe</h1>
+    <div class="meta">
+      Threshold: ${threshold.toFixed(2)} | Potential points: ${potentialWildfires.length} | Total scored: ${results.length}
+    </div>
+    <div id="globe"></div>
+  </div>
+  <script>
+    const points = ${escapeInlineJson(mapPoints)};
+    const trace = {
+      type: "scattergeo",
+      mode: "markers",
+      lon: points.map((p) => p.long),
+      lat: points.map((p) => p.lat),
+      text: points.map((p) => \`\${p.id}: risk=\${Number(p.wildfireProbability).toFixed(4)}\`),
+      hovertemplate: "%{text}<br>lat=%{lat:.4f}, long=%{lon:.4f}<extra></extra>",
+      marker: {
+        size: points.map((p) => 8 + (Number(p.wildfireProbability) * 14)),
+        color: points.map((p) => Number(p.wildfireProbability)),
+        cmin: 0,
+        cmax: 1,
+        colorscale: "YlOrRd",
+        colorbar: { title: "Risk" },
+        line: { color: "#f5f5f5", width: 0.6 }
+      }
+    };
+
+    const layout = {
+      paper_bgcolor: "#0b1020",
+      plot_bgcolor: "#0b1020",
+      font: { color: "#f2f4f8" },
+      margin: { l: 10, r: 10, t: 10, b: 10 },
+      geo: {
+        projection: { type: "orthographic" },
+        showland: true,
+        landcolor: "#2a3b4d",
+        showocean: true,
+        oceancolor: "#0d1f3a",
+        coastlinecolor: "#8ea1b6",
+        showcountries: true,
+        countrycolor: "#5f738a",
+        bgcolor: "#0b1020"
+      }
+    };
+    Plotly.newPlot("globe", [trace], layout, { responsive: true, displaylogo: false });
+  </script>
+</body>
+</html>`;
+
+  fs.writeFileSync(absolutePath, html, "utf8");
+  return absolutePath;
+}
+
 async function main() {
+  // Batch execution flow:
+  // load rows -> score sequentially -> rank -> emit machine + human artifacts.
   const args = parseArguments(process.argv.slice(2));
   const model = loadJson(args.model);
   const contextIndex = buildContextIndex(args.contextCsv);
@@ -142,6 +288,7 @@ async function main() {
   }
 
   results.sort((left, right) => right.wildfireProbability - left.wildfireProbability);
+  const potentialWildfires = selectPotentialWildfires(results, args.potentialThreshold);
 
   const outputDocument = {
     input: path.resolve(args.input),
@@ -156,8 +303,10 @@ async function main() {
       : {
           type: "open-meteo",
           url: "https://api.open-meteo.com/v1/forecast",
-        },
+    },
     resultCount: results.length,
+    potentialThreshold: args.potentialThreshold,
+    potentialWildfireCount: potentialWildfires.length,
     results,
   };
 
@@ -174,6 +323,16 @@ async function main() {
   }
 
   printSummary(results);
+  const printedPotentialWildfires = printPotentialWildfireSummary(results, args.potentialThreshold);
+  const textOutputPath = writePotentialWildfiresText(args.outputTxt, printedPotentialWildfires, args.potentialThreshold);
+  const htmlOutputPath = writePotentialWildfiresGlobeHtml(
+    args.outputHtml,
+    results,
+    printedPotentialWildfires,
+    args.potentialThreshold
+  );
+  console.log(`Saved potential wildfire text report to ${textOutputPath}`);
+  console.log(`Saved potential wildfire globe map to ${htmlOutputPath}`);
   if (!args.outputJson && !args.outputCsv) {
     console.log(JSON.stringify(outputDocument, null, 2));
   }

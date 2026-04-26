@@ -1,5 +1,9 @@
 "use strict";
 
+// Shared math/data utilities for wildfire-risk scripts.
+// Centralizing these helpers keeps training, inference, and evaluation behavior
+// consistent across baseline and true-classifier pipelines.
+
 const fs = require("fs");
 const path = require("path");
 
@@ -28,6 +32,7 @@ const DERIVED_FEATURES = [
 const FEATURE_NAMES = FEATURE_SPECS.map((spec) => spec.name).concat(DERIVED_FEATURES);
 
 function parseCsv(text) {
+  // Lightweight CSV parser with quoted-field support to avoid extra deps.
   const rows = [];
   let field = "";
   let row = [];
@@ -91,12 +96,14 @@ function parseCsv(text) {
 }
 
 function loadCsv(csvPath) {
+  // Load and parse CSV into an array of row objects keyed by header name.
   const absolutePath = path.resolve(csvPath);
   const text = fs.readFileSync(absolutePath, "utf8");
   return parseCsv(text);
 }
 
 function parseNumber(value) {
+  // Parse finite numeric values; use null for empty/invalid entries.
   if (value === undefined || value === null || value === "") {
     return null;
   }
@@ -106,17 +113,31 @@ function parseNumber(value) {
 }
 
 function parseDateValue(value) {
+  // Return null for invalid timestamps instead of throwing.
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function dayOfYear(date) {
+  // UTC day-of-year for seasonal cyclic features.
   const start = new Date(Date.UTC(date.getUTCFullYear(), 0, 0));
   const diff = date - start;
   return Math.floor(diff / 86400000);
 }
 
+function haversineKm(lat1, lon1, lat2, lon2) {
+  // Great-circle distance in kilometers.
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function buildFeatureMap(record, fallbackDate) {
+  // Construct model input features from a raw CSV/API record.
   const featureMap = {};
 
   FEATURE_SPECS.forEach((spec) => {
@@ -140,11 +161,13 @@ function buildFeatureMap(record, fallbackDate) {
 }
 
 function confidenceToTarget(confidenceValue, threshold = 80) {
+  // FIRMS confidence proxy label used by the baseline model.
   const numericConfidence = parseNumber(confidenceValue);
   return numericConfidence !== null && numericConfidence >= threshold ? 1 : 0;
 }
 
 function splitTemporal(records, ratio = 0.8) {
+  // Oldest -> newest split to mimic forward-looking validation.
   const sorted = [...records].sort((left, right) => left.timestamp - right.timestamp);
   const splitIndex = Math.max(1, Math.min(sorted.length - 1, Math.floor(sorted.length * ratio)));
   return {
@@ -154,6 +177,7 @@ function splitTemporal(records, ratio = 0.8) {
 }
 
 function computeImputationStats(records, featureNames = FEATURE_NAMES) {
+  // Feature-wise means from training data for missing-value imputation.
   const sums = Object.fromEntries(featureNames.map((name) => [name, 0]));
   const counts = Object.fromEntries(featureNames.map((name) => [name, 0]));
 
@@ -176,6 +200,7 @@ function computeImputationStats(records, featureNames = FEATURE_NAMES) {
 }
 
 function applyImputation(records, means, featureNames = FEATURE_NAMES) {
+  // In-place imputation for record arrays used during training/eval.
   for (const record of records) {
     const missing = [];
     for (const featureName of featureNames) {
@@ -189,6 +214,7 @@ function applyImputation(records, means, featureNames = FEATURE_NAMES) {
 }
 
 function computeNormalizationStats(records, featureNames = FEATURE_NAMES) {
+  // Z-score stats computed from training split only.
   const means = {};
   const stds = {};
 
@@ -204,6 +230,7 @@ function computeNormalizationStats(records, featureNames = FEATURE_NAMES) {
 }
 
 function normalizeVector(featureMap, stats, featureNames = FEATURE_NAMES) {
+  // Convert named feature map -> dense normalized vector.
   return featureNames.map((featureName) => {
     const centered = featureMap[featureName] - stats.means[featureName];
     return centered / stats.stds[featureName];
@@ -211,6 +238,7 @@ function normalizeVector(featureMap, stats, featureNames = FEATURE_NAMES) {
 }
 
 function imputeFeatureMap(featureMap, means, featureNames = FEATURE_NAMES) {
+  // Non-mutating imputation used by inference-time callers.
   const completedFeatureMap = { ...featureMap };
   const missingFeatures = [];
 
@@ -228,6 +256,7 @@ function imputeFeatureMap(featureMap, means, featureNames = FEATURE_NAMES) {
 }
 
 function sigmoid(value) {
+  // Numerically stable sigmoid.
   if (value >= 0) {
     const expValue = Math.exp(-value);
     return 1 / (1 + expValue);
@@ -238,6 +267,7 @@ function sigmoid(value) {
 }
 
 function dotProduct(left, right) {
+  // Dense vector dot product.
   let total = 0;
   for (let index = 0; index < left.length; index += 1) {
     total += left[index] * right[index];
@@ -246,6 +276,7 @@ function dotProduct(left, right) {
 }
 
 function trainLogisticRegression(records, options = {}) {
+  // Batch gradient-descent logistic regression with L2 regularization.
   const epochs = options.epochs ?? 600;
   const learningRate = options.learningRate ?? 0.05;
   const l2Penalty = options.l2Penalty ?? 0.001;
@@ -280,14 +311,17 @@ function trainLogisticRegression(records, options = {}) {
 }
 
 function predictLogit(vector, model) {
+  // Linear score before sigmoid calibration.
   return dotProduct(model.weights, vector) + model.bias;
 }
 
 function predictProbability(vector, model) {
+  // Baseline probability = sigmoid(logit).
   return sigmoid(predictLogit(vector, model));
 }
 
 function fitPlattScaling(scoredRecords, options = {}) {
+  // Fits logistic calibration layer on logits (Platt scaling).
   const positives = scoredRecords.filter((record) => record.target === 1).length;
   const negatives = scoredRecords.length - positives;
 
@@ -333,6 +367,7 @@ function fitPlattScaling(scoredRecords, options = {}) {
 }
 
 function calibrateLogit(logit, calibration) {
+  // Apply fitted calibration or identity fallback.
   if (!calibration || calibration.type === "identity") {
     return sigmoid(logit);
   }
@@ -341,6 +376,7 @@ function calibrateLogit(logit, calibration) {
 }
 
 function confusionMetrics(scoredRecords, threshold = 0.5) {
+  // Standard thresholded classification metrics.
   let truePositive = 0;
   let falsePositive = 0;
   let trueNegative = 0;
@@ -377,6 +413,7 @@ function confusionMetrics(scoredRecords, threshold = 0.5) {
 }
 
 function logLoss(scoredRecords) {
+  // Mean cross-entropy.
   const epsilon = 1e-9;
   const total = scoredRecords.reduce((sum, record) => {
     const probability = Math.min(1 - epsilon, Math.max(epsilon, record.probability));
@@ -386,6 +423,7 @@ function logLoss(scoredRecords) {
 }
 
 function brierScore(scoredRecords) {
+  // Mean squared error of probabilistic predictions.
   if (scoredRecords.length === 0) {
     return 0;
   }
@@ -399,6 +437,7 @@ function brierScore(scoredRecords) {
 }
 
 function areaUnderCurve(scoredRecords) {
+  // ROC AUC by trapezoidal integration over sorted predictions.
   const sorted = [...scoredRecords].sort((left, right) => right.probability - left.probability);
   const positives = sorted.filter((record) => record.target === 1).length;
   const negatives = sorted.length - positives;
@@ -433,11 +472,13 @@ function ensureDirectoryExists(directoryPath) {
 }
 
 function saveJson(filePath, value) {
+  // Consistent JSON writer for script artifacts.
   ensureDirectoryExists(path.dirname(filePath));
   fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 function writeCsv(filePath, headers, rows) {
+  // Minimal CSV writer with quoting for commas/newlines/quotes.
   ensureDirectoryExists(path.dirname(filePath));
   const escapeCell = (value) => {
     if (value === undefined || value === null) {
@@ -460,6 +501,7 @@ function writeCsv(filePath, headers, rows) {
 }
 
 function loadJson(filePath) {
+  // Resolve relative paths from caller cwd and parse JSON.
   return JSON.parse(fs.readFileSync(path.resolve(filePath), "utf8"));
 }
 
@@ -475,8 +517,10 @@ module.exports = {
   computeNormalizationStats,
   confidenceToTarget,
   confusionMetrics,
+  dayOfYear,
   ensureDirectoryExists,
   fitPlattScaling,
+  haversineKm,
   imputeFeatureMap,
   loadCsv,
   loadJson,

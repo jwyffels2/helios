@@ -1,5 +1,9 @@
 "use strict";
 
+// CLI entry point for single-record inference with the baseline proxy model.
+// It accepts either a JSON input document, direct CLI feature values, or both
+// (CLI wins), then applies the exact same feature pipeline used during training.
+
 const path = require("path");
 const {
   FEATURE_NAMES,
@@ -11,6 +15,8 @@ const {
 } = require("./common");
 
 function parseArguments(argv) {
+  // Keep argument parsing explicit so users can see which flags map to which
+  // model inputs when running this script manually.
   const args = {
     model: path.join(__dirname, "output", "model.json"),
     input: null,
@@ -37,6 +43,8 @@ function parseArguments(argv) {
 }
 
 function inputToRecord(inputDocument, cliValues) {
+  // Normalize the combined input into the raw-record schema expected by
+  // buildFeatureMap. This keeps training and inference feature names aligned.
   return {
     lat: cliValues.lat ?? inputDocument.lat,
     long: cliValues.long ?? cliValues.lon ?? inputDocument.long ?? inputDocument.lon,
@@ -56,6 +64,9 @@ function inputToRecord(inputDocument, cliValues) {
 }
 
 function main() {
+  // 1) Load model + input.
+  // 2) Build/impute/normalize features.
+  // 3) Score with logistic regression and print a human-readable JSON response.
   const args = parseArguments(process.argv.slice(2));
   const model = loadJson(args.model);
   const inputDocument = args.input ? loadJson(args.input) : {};

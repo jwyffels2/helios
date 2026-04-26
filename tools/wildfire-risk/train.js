@@ -1,5 +1,9 @@
 "use strict";
 
+// Trains the original "proxy risk" baseline model from FIRMS-only detections.
+// This model predicts high-confidence detection likelihood, not true wildfire
+// occurrence, and is kept for baseline comparison against the true classifier.
+
 const path = require("path");
 const {
   FEATURE_NAMES,
@@ -21,6 +25,8 @@ const {
 } = require("./common");
 
 function parseArguments(argv) {
+  // CLI options intentionally mirror common logistic-regression hyperparameters
+  // so model behavior can be tuned from the command line without code edits.
   const args = {
     csv: "c:\\Users\\Leonard\\Desktop\\firms_ee_feature_join.csv",
     output: path.join(__dirname, "output", "model.json"),
@@ -61,6 +67,7 @@ function formatMetric(value) {
 }
 
 function main() {
+  // Parse and featurize all valid rows.
   const args = parseArguments(process.argv.slice(2));
   const rawRows = loadCsv(args.csv);
 
@@ -80,6 +87,7 @@ function main() {
     .filter(Boolean);
 
   const { training, validation } = splitTemporal(preparedRows, 0.8);
+  // Compute imputation/normalization from training data only to avoid leakage.
   const imputationMeans = computeImputationStats(training);
   applyImputation(training, imputationMeans);
   applyImputation(validation, imputationMeans);
@@ -132,6 +140,7 @@ function main() {
 
   saveJson(args.output, modelDocument);
 
+  // Print concise training diagnostics for quick experiment tracking.
   console.log(`Saved model to ${path.resolve(args.output)}`);
   console.log(`Rows: train=${training.length} validation=${validation.length}`);
   console.log(`Validation accuracy: ${formatMetric(metrics.accuracy)}`);

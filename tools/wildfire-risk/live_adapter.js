@@ -1,5 +1,9 @@
 "use strict";
 
+// Baseline live adapter:
+// fetches near-real-time weather for one coordinate, maps API fields into the
+// baseline model schema, then runs proxy-risk inference.
+
 const fs = require("fs");
 const path = require("path");
 const {
@@ -10,8 +14,12 @@ const {
   predictProbability,
   saveJson,
 } = require("./common");
+const {
+  windComponentsFromSpeedAndDirection,
+} = require("./weather_api");
 
 function parseArguments(argv) {
+  // Require coordinates because everything else can be inferred or defaulted.
   const args = {
     model: path.join(__dirname, "output", "model.json"),
     output: null,
@@ -52,23 +60,14 @@ function parseArguments(argv) {
   return args;
 }
 
-function windComponentsFromSpeedAndDirection(speed, directionDegrees) {
-  if (!Number.isFinite(speed) || !Number.isFinite(directionDegrees)) {
-    return { windU: null, windV: null };
-  }
-
-  const angle = (directionDegrees * Math.PI) / 180;
-  return {
-    windU: -speed * Math.sin(angle),
-    windV: -speed * Math.cos(angle),
-  };
-}
-
 function firstValue(array) {
+  // Daily arrays from Open-Meteo are 1-day windows for this script, so the
+  // first value is the relevant one.
   return Array.isArray(array) && array.length > 0 ? array[0] : null;
 }
 
 function mapWeatherResponseToModelInput(payload, latitude, longitude, dateOverride) {
+  // Flatten Open-Meteo payload structure to the model's raw input keys.
   const current = payload.current ?? {};
   const daily = payload.daily ?? {};
   const windSpeed = current.wind_speed_10m;
@@ -89,6 +88,7 @@ function mapWeatherResponseToModelInput(payload, latitude, longitude, dateOverri
 }
 
 function modelInputToRawRecord(modelInput) {
+  // Rename to the same column-style keys used in the training CSV.
   return {
     lat: modelInput.lat,
     long: modelInput.long,
@@ -126,6 +126,7 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
 }
 
 async function loadWeatherPayload(args) {
+  // Supports both online mode (API) and deterministic offline replay.
   if (args.sourceFile) {
     const json = fs.readFileSync(path.resolve(args.sourceFile), "utf8");
     return JSON.parse(json);
@@ -135,6 +136,7 @@ async function loadWeatherPayload(args) {
 }
 
 async function main() {
+  // End-to-end inference flow for one location.
   const args = parseArguments(process.argv.slice(2));
   const model = loadJson(args.model);
   const weatherPayload = await loadWeatherPayload(args);

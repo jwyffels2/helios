@@ -25,6 +25,7 @@ const {
 } = require("./true_classifier_runtime");
 
 function parseArguments(argv) {
+  // Parse CLI overrides for one-point scoring.
   const args = {
     model: path.join(__dirname, "output", "true_classifier_model.json"),
     output: null,
@@ -70,6 +71,7 @@ function parseArguments(argv) {
 }
 
 async function loadWeatherPayload(args) {
+  // Offline replay mode is useful for deterministic demos/tests.
   if (args.sourceFile) {
     const json = fs.readFileSync(path.resolve(args.sourceFile), "utf8");
     return JSON.parse(json);
@@ -79,6 +81,8 @@ async function loadWeatherPayload(args) {
 }
 
 async function main() {
+  // Single-point true-classifier scoring flow:
+  // weather fetch -> context lookup -> feature completion -> probability output.
   const args = parseArguments(process.argv.slice(2));
   const model = loadJson(args.model);
   const weatherPayload = await loadWeatherPayload(args);
