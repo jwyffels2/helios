@@ -113,6 +113,8 @@ async function loadWeatherPayload(args, latitude, longitude) {
 
 async function scoreRow(row, args, model, contextIndex) {
   // Score one batch row end-to-end and keep diagnostics for traceability.
+  // apiMappedInput is preserved in JSON output indirectly through featuresUsed
+  // and missingFeatures so a reviewer can see what was actually scored.
   const weatherPayload = await loadWeatherPayload(args, row.lat, row.long);
   const apiMappedInput = mapForecastPayloadToTrueClassifierInput(
     weatherPayload,
@@ -201,6 +203,8 @@ function escapeInlineJson(value) {
 
 function writePotentialWildfiresGlobeHtml(outputPath, results, potentialWildfires, threshold) {
   // Write a self-contained Plotly globe page with risk-scaled markers.
+  // If nothing exceeds the threshold, the page still shows the top ranked points
+  // so the demo artifact remains useful for visual inspection.
   const absolutePath = path.resolve(outputPath);
   fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
 
@@ -284,10 +288,14 @@ async function main() {
   const results = [];
 
   for (const row of rows) {
+    // The loop is sequential on purpose. It avoids burst traffic to the weather
+    // API and keeps terminal output/order easier to debug during demos.
     results.push(await scoreRow(row, args, model, contextIndex));
   }
 
   results.sort((left, right) => right.wildfireProbability - left.wildfireProbability);
+  // Sorting happens before every export so CSV, JSON, terminal summary, and map
+  // all agree on the same priority ordering.
   const potentialWildfires = selectPotentialWildfires(results, args.potentialThreshold);
 
   const outputDocument = {

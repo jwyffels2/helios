@@ -73,6 +73,8 @@ function buildContextIndex(csvPath = DEFAULT_CONTEXT_CSV) {
 function lookupNearestContext(index, candidate, options = {}) {
   // Score candidates by geographic distance + seasonal day penalty to find the
   // closest context row for vegetation/drought fields.
+  // The day penalty lets a slightly farther but seasonally similar row beat a
+  // closer row from the wrong time of year, which matters for vegetation/dryness.
   const dayWindow = options.dayWindow ?? 14;
   const dayPenaltyKm = options.dayPenaltyKm ?? 5;
   const date = parseDateValue(candidate.date) ?? new Date();

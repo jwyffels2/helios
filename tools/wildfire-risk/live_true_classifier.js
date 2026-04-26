@@ -93,6 +93,8 @@ async function main() {
     args.longitude,
     args.date
   );
+  // Weather APIs do not provide every feature used during training. Nearest
+  // seasonal context fills static-ish fields like vegetation and drought proxy.
   Object.assign(apiMappedInput, lookupNearestContext(contextIndex, apiMappedInput));
   const {
     completedFeatureMap,
@@ -102,6 +104,8 @@ async function main() {
   } = scoreTrueClassifierInput(apiMappedInput, model, new Date(apiMappedInput.date));
 
   const result = {
+    // Keep both raw inputs and completed features in the output so single-point
+    // demo results can be traced back to API/context/imputation decisions.
     source: args.sourceFile
       ? {
           type: "file",

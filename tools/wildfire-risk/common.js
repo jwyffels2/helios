@@ -8,6 +8,8 @@ const fs = require("fs");
 const path = require("path");
 
 const FEATURE_SPECS = [
+  // Baseline proxy-model feature mapping. Each entry maps the normalized model
+  // feature name to the column name used by the original FIRMS/environment CSV.
   { name: "lat", source: "lat" },
   { name: "long", source: "long" },
   { name: "groundHeatFlux", source: "Ground_Heat_Flux_surface" },
@@ -24,6 +26,7 @@ const FEATURE_SPECS = [
 ];
 
 const DERIVED_FEATURES = [
+  // Derived features are computed consistently in training and inference.
   "windSpeed",
   "dayOfYearSin",
   "dayOfYearCos",
@@ -33,6 +36,8 @@ const FEATURE_NAMES = FEATURE_SPECS.map((spec) => spec.name).concat(DERIVED_FEAT
 
 function parseCsv(text) {
   // Lightweight CSV parser with quoted-field support to avoid extra deps.
+  // This keeps the tooling runnable with plain Node.js and avoids introducing
+  // package manager setup just to parse the local FIRMS feature join file.
   const rows = [];
   let field = "";
   let row = [];
@@ -277,6 +282,8 @@ function dotProduct(left, right) {
 
 function trainLogisticRegression(records, options = {}) {
   // Batch gradient-descent logistic regression with L2 regularization.
+  // The implementation is intentionally small and serializable: the saved model
+  // is only weights + bias, which can be read by any JS runtime in this repo.
   const epochs = options.epochs ?? 600;
   const learningRate = options.learningRate ?? 0.05;
   const l2Penalty = options.l2Penalty ?? 0.001;
@@ -322,6 +329,9 @@ function predictProbability(vector, model) {
 
 function fitPlattScaling(scoredRecords, options = {}) {
   // Fits logistic calibration layer on logits (Platt scaling).
+  // Calibration turns raw ranking scores into probabilities that are easier to
+  // compare across runs. If validation has one class, identity scaling avoids
+  // pretending calibration was learned from insufficient data.
   const positives = scoredRecords.filter((record) => record.target === 1).length;
   const negatives = scoredRecords.length - positives;
 

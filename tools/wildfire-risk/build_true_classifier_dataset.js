@@ -24,6 +24,8 @@ const {
 } = require("./context_lookup");
 
 const FEATURE_SCHEMA_VERSION = 2;
+// Bump FEATURE_SCHEMA_VERSION whenever generated sample fields change. Resume
+// logic uses this to reject old checkpoints that would train with stale columns.
 
 function parseArguments(argv) {
   // Dataset-generation knobs:
@@ -172,6 +174,8 @@ function clamp(value, minimum, maximum) {
 function generateNegativeCandidate(anchor, bounds, rng) {
   // Sample nearby coordinate/date around a positive anchor, then clamp to
   // dataset bounds so negatives stay in-distribution.
+  // The sampled point is not automatically accepted; later checks reject points
+  // that are too close to known positives or duplicate an existing candidate.
   const angle = rng() * 2 * Math.PI;
   const radiusKm = 30 + (rng() * 170);
   const latDelta = (radiusKm / 111) * Math.cos(angle);
@@ -215,6 +219,8 @@ function seasonalFireScore(date) {
 function hardNegativeScore(candidate) {
   // Higher score means "looks more fire-like" while still being labeled as
   // non-fire background, forcing the model to learn harder boundaries.
+  // This is only a sampling heuristic. The final label is still background=0,
+  // and the model does not receive hardNegativeScore as a training feature.
   const temperature = firstFinite(candidate.temperatureSurface, candidate.tmax, candidate.tmin);
   const precipitation = firstFinite(candidate.precipitation);
   const pdsi = firstFinite(candidate.pdsi);
@@ -252,6 +258,9 @@ function negativeCandidateKey(candidate) {
 function generateNegativeCandidatePool(count, positiveCandidates, bounds, rng, positiveIndex, args, contextIndex) {
   // Generate a de-duplicated pool of valid background candidates and attach
   // context-driven hardness scores used during selection.
+  // The pool is intentionally larger than the final negative count when hard
+  // negatives are enabled, giving selectNegatives enough candidates to choose
+  // the most challenging background examples.
   const candidates = [];
   const seenKeys = new Set();
   let attempts = 0;
@@ -305,6 +314,7 @@ function selectNegatives(candidatePool, args, rng) {
 
 async function enrichSample(sample, label) {
   // Fetch archive weather/context features for the sample coordinate/date.
+  // This is the expensive step, so callers checkpoint periodically around it.
   const weather = await fetchOpenMeteoArchive(sample.lat, sample.long, sample.date.toISOString(), sample.requestOptions);
   return {
     label,
@@ -428,6 +438,9 @@ async function main() {
 
   const selectedPositives = sampleWithoutReplacement(positiveCandidates, args.positives, rng);
   const positiveIndex = buildPositiveIndex(positiveCandidates);
+  // Generate more candidates than needed when hard negatives are requested.
+  // Example: 100 negatives with 50% hard and pool multiplier 4 means create
+  // enough candidate choice around the hard half before mixing random negatives.
   const hardNegativeCount = Math.min(
     args.negatives,
     Math.max(0, Math.round(args.negatives * clamp(args.hardNegativeRatio, 0, 1)))
@@ -453,6 +466,9 @@ async function main() {
 
   let samples = [];
   if (args.resume) {
+    // Resume is conservative: it only reuses a checkpoint if generation
+    // parameters match exactly. That prevents accidentally mixing datasets with
+    // different schemas, sample counts, distance buffers, or context sources.
     try {
       const existing = require("./common").loadJson(args.output);
       if (generationParametersMatch(existing, args, contextIndex)) {
@@ -485,6 +501,8 @@ async function main() {
     }
 
     try {
+      // Each sample is enriched independently so a failed API request can save
+      // progress before throwing. A later run can resume from the checkpoint.
       const enriched = await enrichSample(
         {
           ...plannedSample,

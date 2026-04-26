@@ -92,6 +92,9 @@ function regionBucket(record, geoCellDegrees) {
 function splitTimeAndGeography(records, options) {
   // Build a harder evaluation split:
   // latest samples from held-out geo buckets become the test set.
+  // This reduces overly optimistic results from nearby train/test points that
+  // share weather and terrain patterns. Validation still comes from later
+  // samples in seen regions so calibration has a realistic time shift.
   const sorted = [...records].sort((left, right) => left.timestamp - right.timestamp);
   if (sorted.length < 3) {
     throw new Error("Need at least 3 samples to create train/validation/test splits.");
@@ -209,6 +212,8 @@ function main() {
     geoCellDegrees: args.geoCellDegrees,
   });
   const imputationMeans = computeImputationStats(training, TRUE_FEATURE_NAMES);
+  // Missing-value means and normalization stats are learned from training only.
+  // Validation/test reuse those stats so evaluation does not leak future data.
   applyImputation(training, imputationMeans, TRUE_FEATURE_NAMES);
   applyImputation(validation, imputationMeans, TRUE_FEATURE_NAMES);
   applyImputation(test, imputationMeans, TRUE_FEATURE_NAMES);
@@ -232,6 +237,9 @@ function main() {
 
   const validationLogits = scoreRecords(validation, model);
   const testLogits = scoreRecords(test, model);
+  // Calibration is fit on validation logits, then applied to both validation
+  // and test reporting. Raw metrics are kept so reviewers can see whether
+  // calibration improved probability quality.
   const calibration = fitPlattScaling(validationLogits);
   const validationRawMetrics = summarizeMetrics(logitsToRawProbabilities(validationLogits));
   const validationCalibratedMetrics = summarizeMetrics(applyCalibration(validationLogits, calibration));
@@ -239,6 +247,9 @@ function main() {
   const testCalibratedMetrics = summarizeMetrics(applyCalibration(testLogits, calibration));
 
   const modelDocument = {
+    // The JSON artifact intentionally includes all runtime data needed for
+    // inference: feature order, imputation means, normalization stats, model
+    // weights, bias, calibration, and evaluation metrics.
     modelType: "logistic_regression_binary_fire_classifier",
     targetDescription: "calibrated estimate that the sampled coordinate/time belongs to a wildfire-positive event rather than a sampled non-fire background point",
     limitation: "This is a true binary classifier, but the negative class is generated from sampled background coordinates and historical weather, not hand-labeled field truth.",

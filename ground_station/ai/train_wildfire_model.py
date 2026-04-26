@@ -37,6 +37,9 @@ DEFAULT_DATASET = REPO_ROOT / "tools" / "wildfire-risk" / "output" / "true_class
 DEFAULT_OUTPUT = Path(__file__).resolve().parent / "output" / "wildfire_model_python.json"
 
 FEATURE_NAMES = [
+    # This list must stay aligned with tools/wildfire-risk/true_classifier_common.js.
+    # The Python comparison model reads the Node-generated dataset and evaluates
+    # different model families on the same feature contract.
     "lat",
     "long",
     "elevation",
@@ -71,6 +74,9 @@ FEATURE_NAMES = [
 ]
 
 INTERACTION_PAIRS = [
+    # Manual interaction terms for the "expanded" logistic candidate. These are
+    # domain-shaped pairs where combined effects matter, such as heat + humidity
+    # or temperature + drought. Tree models learn interactions internally.
     ("lat", "long"),
     ("temperatureSurface", "relativeHumiditySurface"),
     ("temperatureSurface", "precipitation"),
@@ -98,6 +104,8 @@ INTERACTION_PAIRS = [
 
 @dataclass
 class Split:
+    """Container for the time/geography split used by every candidate model."""
+
     training: pd.DataFrame
     validation: pd.DataFrame
     test: pd.DataFrame
@@ -106,6 +114,8 @@ class Split:
 
 @dataclass
 class FittedModel:
+    """Serializable summary of one trained candidate and its metrics."""
+
     mode: str
     feature_names: list[str]
     weights: np.ndarray | None
@@ -226,6 +236,8 @@ def build_feature_map(sample: dict[str, Any]) -> dict[str, float | None]:
 
     wind_u = feature_map["windU"]
     wind_v = feature_map["windV"]
+    # Keep derived features identical to the Node pipeline so model comparisons
+    # are about algorithms, not accidental feature drift.
     feature_map["windSpeed"] = math.sqrt((wind_u**2) + (wind_v**2)) if wind_u is not None and wind_v is not None else None
 
     date_value = parse_date(sample.get("date"))
@@ -270,6 +282,9 @@ def region_bucket(row: pd.Series, geo_cell_degrees: float) -> str:
 
 def split_time_and_geography(records: pd.DataFrame, args: argparse.Namespace) -> Split:
     """Split into train/validation/test by time plus held-out geographic cells."""
+    # Test data is both later in time and from held-out coarse regions. This is
+    # harder than a random split and better matches the real question: does the
+    # model generalize to future conditions and nearby-but-unseen places?
     sorted_records = records.sort_values("timestamp").reset_index(drop=True)
     if len(sorted_records) < 3:
         raise SystemExit("Need at least 3 samples to create train/validation/test splits.")
@@ -304,6 +319,8 @@ def split_time_and_geography(records: pd.DataFrame, args: argparse.Namespace) ->
 
 def impute_and_normalize(split: Split) -> tuple[Split, dict[str, float], dict[str, dict[str, float]]]:
     """Fit imputation + normalization on train, then apply to all splits."""
+    # All preprocessing parameters are learned from training only. Validation
+    # and test are transformed with those fixed parameters to avoid data leakage.
     imputation_means: dict[str, float] = {}
     normalization: dict[str, dict[str, float]] = {}
 
@@ -335,6 +352,8 @@ def matrix(frame: pd.DataFrame) -> np.ndarray:
 
 def expanded_matrix(x_values: np.ndarray) -> tuple[np.ndarray, list[str]]:
     """Build manual nonlinear expansion (squares + selected interactions)."""
+    # The expanded logistic model stays interpretable and serializable while
+    # giving it limited nonlinear capacity for common wildfire interactions.
     parts = [x_values]
     names = [f"z:{name}" for name in FEATURE_NAMES]
 
@@ -369,6 +388,8 @@ def sigmoid(logits: np.ndarray) -> np.ndarray:
 
 def train_logistic(x_values: np.ndarray, y_values: np.ndarray, epochs: int, learning_rate: float, l2_penalty: float) -> tuple[np.ndarray, float]:
     """Train logistic regression with batch gradient descent + L2 penalty."""
+    # This mirrors the simple Node baseline so Python can compare "same model,
+    # different implementation" before trying sklearn's stronger estimators.
     weights = np.zeros(x_values.shape[1], dtype=float)
     bias = 0.0
     sample_count = len(y_values)
@@ -486,6 +507,8 @@ def summarize(y_values: np.ndarray, probabilities: np.ndarray) -> dict[str, Any]
 
 def fit_candidate(mode: str, split: Split, args: argparse.Namespace) -> FittedModel:
     """Fit a NumPy logistic candidate and evaluate raw/calibrated metrics."""
+    # Raw probabilities measure the model directly. Calibrated probabilities
+    # apply a validation-fitted sigmoid so reported risk is better behaved.
     x_train, derived_names = transform(matrix(split.training), mode)
     x_validation, _ = transform(matrix(split.validation), mode)
     x_test, _ = transform(matrix(split.test), mode)
@@ -533,6 +556,8 @@ def summarize_probabilities(y_values: np.ndarray, probabilities: np.ndarray, use
 
 def fit_sklearn_candidate(mode: str, split: Split, args: argparse.Namespace) -> FittedModel:
     """Fit and evaluate one sklearn candidate model configuration."""
+    # sklearn models are used only in this comparison artifact. The production
+    # Node path remains available and simpler to inspect/deploy.
     if not SKLEARN_AVAILABLE:
         raise SystemExit("scikit-learn is not installed. Run `poetry add scikit-learn joblib` inside ground_station/ai.")
 
@@ -593,6 +618,8 @@ def fit_sklearn_candidate(mode: str, split: Split, args: argparse.Namespace) -> 
     test_calibrated_metrics = test_raw_metrics
 
     if tree_mode:
+        # Tree models can produce poorly calibrated probabilities. Use sklearn's
+        # cross-validated calibrator when each class has enough samples.
         class_counts = np.bincount(y_train)
         nonzero_class_counts = class_counts[class_counts > 0]
         max_folds = int(nonzero_class_counts.min()) if len(nonzero_class_counts) else 0
@@ -639,6 +666,8 @@ def fit_sklearn_candidate(mode: str, split: Split, args: argparse.Namespace) -> 
 
 def choose_model(candidates: list[FittedModel]) -> FittedModel:
     """Choose best candidate by calibrated validation log loss, then AUC."""
+    # Log loss is the primary criterion because this pipeline cares about usable
+    # probabilities, not only ranking. AUC is a tie-breaker for ranking quality.
     def key(candidate: FittedModel) -> tuple[float, float]:
         log_loss_value = candidate.validation["calibrated"]["logLoss"]
         auc_value = candidate.validation["calibrated"]["auc"]
@@ -707,6 +736,9 @@ def main() -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     artifact = {
+        # The output artifact is intentionally descriptive rather than a direct
+        # runtime pickle/joblib. It records what won, how it was evaluated, and
+        # enough preprocessing/model data to audit the comparison.
         "modelType": "python_wildfire_binary_fire_classifier",
         "description": "Python wildfire model trained from the generated Node true-classifier dataset. The existing Node model remains the baseline.",
         "inputDataset": str(dataset_path),

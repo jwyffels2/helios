@@ -1,9 +1,14 @@
 param(
+  # Existing artifacts are passed in by path so the same script can run a small
+  # smoke dataset, a full demo dataset, or a future dataset without edits.
   [string]$DatasetPath = "tools/wildfire-risk/output/true_classifier_dataset.json",
   [string]$NodeModelPath = "tools/wildfire-risk/output/true_classifier_model.json",
   [string]$PythonModelPath = "ground_station/ai/output/wildfire_model_python.json",
   [string]$BatchInputPath = "tools/wildfire-risk/batch_example.csv",
   [string]$SummaryPath = "tools/wildfire-risk/output/ai_model_demo_summary.txt",
+  # AllowPartial is intentionally opt-in. The default behavior refuses to train
+  # on checkpointed/incomplete data so demo metrics are not accidentally quoted
+  # from a half-built dataset.
   [switch]$AllowPartial,
   [switch]$SkipNodeTrain,
   [switch]$SkipPythonTrain,
@@ -120,6 +125,8 @@ try {
 
   if (-not $SkipPythonTrain) {
     # Train the Python comparison model inside the pinned AI container image.
+    # Keeping Python in a container avoids requiring every teammate to install
+    # Poetry/scikit-learn directly on Windows.
     Ensure-PodmanReady
 
     if (-not $SkipContainerBuild) {
@@ -182,6 +189,8 @@ try {
   $pythonTestCal = $selectedMetrics.test.calibrated
 
   $summaryLines = @(
+    # Keep the final summary plain text so it is easy to paste into slides,
+    # meeting notes, or the terminal without needing a JSON viewer.
     "Wildfire AI Demo Summary",
     "GeneratedAt: $(Get-Date -Format o)",
     "",

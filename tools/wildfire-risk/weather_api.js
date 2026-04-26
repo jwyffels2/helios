@@ -11,6 +11,9 @@ const path = require("path");
 const DEFAULT_CACHE_DIR = path.join(__dirname, "output", "cache", "open-meteo");
 const FORECAST_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 let nextRequestAllowedAt = 0;
+// Open-Meteo requests are shared by dataset generation and demos. The module
+// caches successful responses locally, retries rate-limit responses, and can
+// throttle calls so large dataset builds do not hammer the API.
 
 function toIsoHourString(value) {
   // Open-Meteo hourly timestamps are usually naive; normalize to explicit UTC.
@@ -133,6 +136,8 @@ function dailyValueForDate(daily, fieldName, targetDate) {
 
 function laggedWeatherFeatures(hourly, targetDate) {
   // Build the temporal-context features used by the true classifier.
+  // Fire risk often depends on accumulated heat, dryness, and wind rather than
+  // only current conditions, so these rolling aggregates give the model context.
   const temperature24h = hourlyWindowValues(hourly, "temperature_2m", targetDate, 24);
   const temperature72h = hourlyWindowValues(hourly, "temperature_2m", targetDate, 72);
   const humidity24h = hourlyWindowValues(hourly, "relative_humidity_2m", targetDate, 24);
@@ -207,6 +212,8 @@ function writeCache(cachePath, url, payload) {
 async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFINITY, requestOptions = {}) {
   // Shared network fetch wrapper:
   // cache-first read, then retried fetch with optional throttling/backoff.
+  // Historical archive responses are treated as immutable and cached forever;
+  // forecast responses use a shorter max age because current weather changes.
   const cachePath = buildCachePath(cacheKey, url);
   const cachedPayload = readCache(cachePath, maxAgeMs);
   if (cachedPayload) {
@@ -260,6 +267,8 @@ async function fetchJsonWithCache(url, cacheKey, maxAgeMs = Number.POSITIVE_INFI
 
 async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOptions = {}) {
   // Historical query used during dataset generation.
+  // It requests the target day plus seven prior days so lagged features can be
+  // computed for positives and sampled background negatives.
   const targetDate = new Date(isoDateTime);
   const dateString = targetDate.toISOString().slice(0, 10);
   const url = new URL("https://archive-api.open-meteo.com/v1/archive");
@@ -319,6 +328,9 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOp
 
 async function fetchOpenMeteoForecast(latitude, longitude) {
   // Near-real-time forecast/current query used for live and batch inference.
+  // past_days=7 is requested for the same reason as archive generation: the
+  // true classifier expects short-term history features in addition to current
+  // weather.
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
@@ -363,6 +375,8 @@ async function fetchOpenMeteoForecast(latitude, longitude) {
 
 function mapForecastPayloadToTrueClassifierInput(payload, latitude, longitude, dateOverride) {
   // Map forecast payload to the canonical true-classifier input schema.
+  // Static context such as vegetation and drought is added later by
+  // context_lookup.js because Open-Meteo does not provide those fields here.
   const current = payload.current ?? {};
   const daily = payload.daily ?? {};
   const targetDate = new Date(dateOverride ?? (current.time ? `${current.time}Z` : null) ?? new Date().toISOString());

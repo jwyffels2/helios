@@ -45,6 +45,8 @@ function parseArguments(argv) {
 function inputToRecord(inputDocument, cliValues) {
   // Normalize the combined input into the raw-record schema expected by
   // buildFeatureMap. This keeps training and inference feature names aligned.
+  // CLI values override JSON so a saved payload can be reused while tweaking one
+  // field from the terminal.
   return {
     lat: cliValues.lat ?? inputDocument.lat,
     long: cliValues.long ?? cliValues.lon ?? inputDocument.long ?? inputDocument.lon,
@@ -77,6 +79,8 @@ function main() {
   const probability = predictProbability(vector, model);
 
   const response = {
+    // This baseline reports proxyRiskProbability because it was trained on
+    // FIRMS confidence labels, not explicit fire-vs-background examples.
     modelType: model.modelType,
     targetDescription: model.targetDescription,
     proxyRiskProbability: probability,

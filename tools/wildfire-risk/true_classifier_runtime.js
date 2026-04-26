@@ -29,6 +29,9 @@ function scoreTrueClassifierInput(inputRecord, model, fallbackDate) {
     featureNames
   );
   const vector = normalizeVector(completedFeatureMap, model.normalization, featureNames);
+  // The saved logistic model works in normalized vector space. rawLogit is the
+  // linear model score; rawProbability is sigmoid(rawLogit); calibratedProbability
+  // applies the validation-fitted calibration stored in the model artifact.
   const rawLogit = predictLogit(vector, model);
   const rawProbability = predictProbability(vector, model);
   const calibratedProbability = calibrateLogit(rawLogit, model.calibration);

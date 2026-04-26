@@ -103,6 +103,8 @@ function modelInputToRawRecord(modelInput) {
 }
 
 async function fetchOpenMeteoForecast(latitude, longitude) {
+  // This adapter belongs to the older proxy model, so it requests only the
+  // smaller set of weather fields that model can consume.
   const url = new URL("https://api.open-meteo.com/v1/forecast");
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("longitude", String(longitude));
@@ -153,6 +155,8 @@ async function main() {
   const probability = predictProbability(vector, model);
 
   const result = {
+    // Include apiMappedInput and missingFeaturesImputed so users can see which
+    // fields came from live weather and which fell back to training means.
     source: args.sourceFile
       ? {
           type: "file",

@@ -1,2 +1,4 @@
+# Keep this output folder available for scripts, but exclude generated datasets,
+# trained models, batch reports, cached API responses, and local demo maps.
 *
 !.gitignore
