@@ -10,6 +10,8 @@ entity helios is
     rstn_i      : in  std_ulogic;  -- active-high button on board
     uart0_rxd_i : in  std_ulogic;
     uart0_txd_o : out std_ulogic;
+    uart1_rxd_i : in  std_ulogic;
+    uart1_txd_o : out std_ulogic;
     gpio_o      : out std_ulogic_vector(31 downto 0);
     pwm_o       : out std_ulogic_vector(31 downto 0);
 
@@ -60,6 +62,9 @@ begin
       IO_UART0_EN      => true,
       IO_UART0_RX_FIFO => 1,
       IO_UART0_TX_FIFO => 1,
+      IO_UART1_EN      => true,
+      IO_UART1_RX_FIFO => 1,
+      IO_UART1_TX_FIFO => 1,
       IO_CLINT_EN      => true,
       IO_GPTMR_NUM     => 1,
 
@@ -68,7 +73,7 @@ begin
       IMEM_EN   => true,
       IMEM_SIZE => 32*1024,
       DMEM_EN   => true,
-      DMEM_SIZE => 8*1024,
+      DMEM_SIZE => 128*1024,
 
       RISCV_ISA_C      => true,
       RISCV_ISA_M      => true,
@@ -120,8 +125,9 @@ begin
       uart0_rtsn_o => open,
       uart0_ctsn_i => '0',
 
-      uart1_txd_o  => open,
-      uart1_rxd_i  => '0',
+      -- UART1 (camera)
+      uart1_txd_o  => uart1_txd_o,
+      uart1_rxd_i  => uart1_rxd_i,
       uart1_rtsn_o => open,
       uart1_ctsn_i => '0',
 
