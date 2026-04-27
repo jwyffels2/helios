@@ -5,15 +5,19 @@ use ieee.numeric_std.all;
 library neorv32;
 use neorv32.neorv32_package.all;
 
--- Wrapper that matches the Basys3 XDC.
--- VGA outputs are sourced from the framebuffer scanout path.
-
+-- Basys3 top-level wrapper for the NEORV32 system.
+--
+-- This file is the hardware integration point. The CPU owns normal peripherals
+-- such as UART, GPIO, PWM, and TWI. The framebuffer is attached separately on
+-- the NEORV32 external bus (XBUS), then scanned continuously by VGA logic.
 entity helios is
    port (
       clk_i       : in    std_ulogic;
-      rstn_i      : in    std_ulogic;  -- active-high button on board
+      rstn_i      : in    std_ulogic;  -- active-high push button on board
       uart0_rxd_i : in    std_ulogic;
       uart0_txd_o : out   std_ulogic;
+      uart1_rxd_i : in    std_ulogic;
+      uart1_txd_o : out   std_ulogic;
       gpio_o      : out   std_ulogic_vector(31 downto 0);
       pwm_o       : out   std_ulogic_vector(31 downto 0);
       twi_sda_io  : inout std_logic;
@@ -40,6 +44,8 @@ architecture rtl of helios is
    signal twi_scl_core_i : std_ulogic;
    signal twi_scl_core_o : std_ulogic;
 
+   -- NEORV32 XBUS signals. The CPU uses this bus to write RGB332 pixels into
+   -- the framebuffer MMIO window at 0xF0000000.
    signal xbus_adr   : std_ulogic_vector(31 downto 0);
    signal xbus_dat_o : std_ulogic_vector(31 downto 0);
    signal xbus_we    : std_ulogic;
@@ -51,6 +57,8 @@ architecture rtl of helios is
    signal xbus_ack   : std_ulogic;
    signal xbus_err   : std_ulogic := '0';
 
+   -- Narrowed framebuffer write interface produced by the XBUS slave. The VRAM
+   -- block accepts these writes while VGA reads from a separate scanout port.
    signal vram_cpu_we    : std_ulogic;
    signal vram_cpu_be    : std_ulogic_vector(3 downto 0);
    signal vram_cpu_addr  : unsigned(31 downto 0);
@@ -62,8 +70,12 @@ architecture rtl of helios is
 
 begin
 
+   -- The Basys3 push button is active high, while NEORV32 expects active-low
+   -- reset, so invert once at the board boundary.
    rstn_core <= not rstn_i;
 
+   -- Model the TWI pins as open-drain outputs: drive low for zero, otherwise
+   -- release the external pull-up.
    twi_sda_io <= '0' when twi_sda_core_o = '0' else 'Z';
    twi_scl_io <= '0' when twi_scl_core_o = '0' else 'Z';
 
@@ -77,13 +89,16 @@ begin
          IO_UART0_EN      => true,
          IO_UART0_RX_FIFO => 1,
          IO_UART0_TX_FIFO => 1,
+         IO_UART1_EN      => true,
+         IO_UART1_RX_FIFO => 1,
+         IO_UART1_TX_FIFO => 1,
          IO_CLINT_EN      => true,
          IO_GPTMR_NUM     => 1,
          BOOT_MODE_SELECT => 0,
          IMEM_EN          => true,
          IMEM_SIZE        => 32 * 1024,
          DMEM_EN          => true,
-         DMEM_SIZE        => 8 * 1024,
+         DMEM_SIZE        => 128 * 1024,
          RISCV_ISA_C      => true,
          RISCV_ISA_M      => true,
          RISCV_ISA_Zicntr => true,
@@ -102,6 +117,8 @@ begin
          jtag_tdo_o   => open,
          jtag_tms_i   => '0',
 
+         -- External bus master side. Only the framebuffer slave responds to
+         -- this window in this design.
          xbus_adr_o   => xbus_adr,
          xbus_dat_o   => xbus_dat_o,
          xbus_cti_o   => open,
@@ -133,8 +150,10 @@ begin
          uart0_rtsn_o => open,
          uart0_ctsn_i => '0',
 
-         uart1_txd_o  => open,
-         uart1_rxd_i  => '0',
+         -- UART1 is kept separate from the boot/debug UART so camera/comms
+         -- traffic does not interfere with the console.
+         uart1_txd_o  => uart1_txd_o,
+         uart1_rxd_i  => uart1_rxd_i,
          uart1_rtsn_o => open,
          uart1_ctsn_i => '0',
 
@@ -175,6 +194,8 @@ begin
          mext_irq_i   => '0'
       );
 
+   -- Decode CPU writes in the framebuffer address range and translate the
+   -- 32-bit XBUS transaction into byte enables for the RGB332 VRAM.
    u_vram_xbus : entity work.vram_xbus_slave
       generic map (
          BASE_ADDR => x"F0000000",
@@ -201,6 +222,8 @@ begin
          cpu_wdata_o  => vram_cpu_wdata
       );
 
+   -- Dual-port framebuffer storage. Software writes through the CPU side, and
+   -- VGA scanout reads pixels every display tick from the independent read side.
    u_vram : entity work.vram_rgb332_dp
       generic map (
          FB_SIZE => 19200
@@ -219,6 +242,8 @@ begin
          vga_rdata_o => vga_pixel
       );
 
+   -- VGA never asks the CPU for pixels. It continuously walks the framebuffer,
+   -- scales the 160x120 image to 640x480, and drives the monitor pins.
    u_vga_scanout : entity work.vga_scanout_rgb332
       generic map (
          FB_WIDTH   => 160,

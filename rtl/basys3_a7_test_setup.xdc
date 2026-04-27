@@ -32,7 +32,13 @@ set_property PACKAGE_PIN U14 [get_ports {gpio_o[6]}]
 set_property PACKAGE_PIN V14 [get_ports {gpio_o[7]}]
 set_property IOSTANDARD LVCMOS33 [get_ports {gpio_o[*]}]
 
-# Camera external clock PWM
+## UART1 header used by the camera/comms path.
+set_property PACKAGE_PIN J1 [get_ports uart1_rxd_i]
+set_property IOSTANDARD LVCMOS33 [get_ports uart1_rxd_i]
+set_property PACKAGE_PIN L2 [get_ports uart1_txd_o]
+set_property IOSTANDARD LVCMOS33 [get_ports uart1_txd_o]
+
+## Camera external clock PWM.
 set_property PACKAGE_PIN K17 [get_ports pwm_o[0]]
 set_property IOSTANDARD LVCMOS33 [get_ports {pwm_o[*]}]
 
