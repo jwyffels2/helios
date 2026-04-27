@@ -79,6 +79,22 @@ if {[file isdirectory [file join $neorv32_rtl_dir system_integration]]} {
 }
 
 # --------------------------------------------------------------------
+# Framebuffer RTL sources (XBUS -> VRAM)
+# --------------------------------------------------------------------
+set fb_vram_files [list \
+  [file join $script_dir vga_640x480_timing.vhd] \
+  [file join $script_dir vga_scanout_rgb332.vhd] \
+  [file join $script_dir vram_xbus_slave.vhd] \
+  [file join $script_dir vram_rgb332_dp.vhd] \
+]
+foreach f $fb_vram_files {
+  if {![file exists $f]} {
+    error "Framebuffer RTL file not found: $f"
+  }
+}
+add_files $fb_vram_files
+
+# --------------------------------------------------------------------
 # Your wrapper top-level (instantiates neorv32_top)
 #   File: C:\helios\rtl\helios.vhd
 # --------------------------------------------------------------------

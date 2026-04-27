@@ -20,15 +20,15 @@ rem ----------------------------------------------------
 rem Optional: create image + run build_neorv32.bat with --create
 rem ----------------------------------------------------
 if %DO_CREATE%==1 (
-    podman build --no-cache -t helios-build -f ./build.dockerfile .
-    call .\build_neorv32.bat --create
+    podman build --no-cache -t helios-build -f ./build.dockerfile . || goto :fail
+    call .\build_neorv32.bat --create || goto :fail
 )
 if %DO_PROGRAM%==1 (
-    call .\build_neorv32.bat
+    call .\build_neorv32.bat || goto :fail
 )
 
 rem Always do a normal build as well
-podman build -t helios-build -f ./build.dockerfile .
+podman build -t helios-build -f ./build.dockerfile . || goto :fail
 
 rem ----------------------------------------------------
 rem Choose ELF path depending on --test
@@ -40,7 +40,13 @@ if %DO_TEST%==1 (
 )
 
 podman run --rm -v "%CD%:/workspace" -w /workspace helios-build ^
-    ./build_neorv32_project.sh "%ELF_PATH%"
+    ./build_neorv32_project.sh "%ELF_PATH%" || goto :fail
 
 popd
 endlocal
+exit /b 0
+
+:fail
+set "ERR=%ERRORLEVEL%"
+popd
+endlocal & exit /b %ERR%
