@@ -57,11 +57,19 @@ main() {
     exit 1
   fi
 
-  # Absolute path to the ELF
+  # Absolute path to the ELF. Do not cd into the ELF output directory here:
+  # alr creates bin/ during the build, so the directory may not exist yet.
   local elf_dir elf_name abs_elf_path
   elf_dir="$(dirname "$elf_input")"   # ./bin or ./tests/bin
   elf_name="$(basename "$elf_input")" # helios or tests
-  abs_elf_path="$(cd "$elf_dir" && pwd)/$elf_name"
+  case "$elf_input" in
+    /*)
+      abs_elf_path="$elf_input"
+      ;;
+    *)
+      abs_elf_path="$SCRIPT_DIR/${elf_input#./}"
+      ;;
+  esac
 
   # Infer project_dir: parent of the 'bin' dir
   # abs_elf_path = /.../project_dir/bin/elf_name  or  /.../project_dir/tests/bin/elf_name
