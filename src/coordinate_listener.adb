@@ -32,24 +32,15 @@ package body Coordinate_Listener is
      (Float_Bytes, Float);
 
    procedure Execute is
-      Lat_Bytes : Float_Bytes;
-      Lon_Bytes : Float_Bytes;
-      Lat : Float;
-      Lon : Float;
+      Coord : Coordinate;
    begin
       if Cmd = Character'Val (16#01#) then
 
-         for I in 0 .. 3 loop
-            Lat_Bytes (I) := Payload (I);
-            Lon_Bytes (I) := Payload (I + 4);
-         end loop;
-
-         Lat := To_Float (Lat_Bytes);
-         Lon := To_Float (Lon_Bytes);
+         Coord := Get_Coordinates;
 
          Logger.Info ("COORDINATES RECEIVED!");
-         Logger.Info (Lat'Image);
-         Logger.Info (Lon'Image);
+         Logger.Info (Coord.Latitude'Image);
+         Logger.Info (Coord.Longitude'Image);
 
          --  THIS IS WHERE CAMERA TRIGGER WILL GO
 
@@ -110,5 +101,22 @@ package body Coordinate_Listener is
 
       end case;
    end Poll;
+
+   function Get_Coordinates return Coordinate
+   is
+      Lat_Bytes : Float_Bytes;
+      Lon_Bytes : Float_Bytes;
+      Result    : Coordinate;
+   begin
+      for I in 0 .. 3 loop
+         Lat_Bytes (I) := Payload (I);
+         Lon_Bytes (I) := Payload (I + 4);
+      end loop;
+
+      Result.Latitude  := To_Float (Lat_Bytes);
+      Result.Longitude := To_Float (Lon_Bytes);
+
+      return Result;
+   end Get_Coordinates;
 
 end Coordinate_Listener;
