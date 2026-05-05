@@ -45,6 +45,13 @@ procedure Helios is
         Uart0.Put ("IMAGE_PREVIEW ");
         for I in 0 .. Preview_Count - 1 loop
             Put_Byte (Buf (I));
+        if Preview_Count > Max_Bytes then
+            Preview_Count := Max_Bytes;
+        end if;
+
+        Uart0.Put ("IMAGE_PREVIEW ");
+        for I in 0 .. Preview_Count - 1 loop
+            Put_Byte (Buf (I));
         end loop;
         Uart0.Put (ASCII.CR & ASCII.LF);
     end Print_Image_Preview;
@@ -69,6 +76,36 @@ procedure Helios is
         Img_Len : Natural := 0;
         Success : Boolean := False;
     begin
+        Uart0.Put ("CAPTURE_START");
+        Uart0.Put (ASCII.CR & ASCII.LF);
+
+        Camera.Capture_Image (Img_Len, Success);
+
+        if Success then
+            Uart0.Put ("CAPTURE_OK");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+
+            Uart0.Put ("IMG_LEN=");
+            Uart0.Put (Integer'Image (Img_Len));
+            Uart0.Put (ASCII.CR & ASCII.LF);
+
+            Print_Image_Preview (Image_Buf, Img_Len, 96);
+
+            Uart0.Put ("SEND_START");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+
+            -- For now send one image burst, not an infinite loop
+            Comms.Send_Image (Img_Len);
+
+            Uart0.Put ("SEND_DONE");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+        else
+            Uart0.Put ("CAPTURE_FAILED");
+            Uart0.Put (ASCII.CR & ASCII.LF);
+        end if;
+    end Do_Capture;
+
+    Cmd : Character;
         Uart0.Put ("CAPTURE_START");
         Uart0.Put (ASCII.CR & ASCII.LF);
 
@@ -132,6 +169,7 @@ begin
                 null;
         end case;
 
+    end loop;
     end loop;
 
 end Helios;
