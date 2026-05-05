@@ -146,4 +146,3 @@ begin
   xbus_ack_o <= ack_r;
 
 end architecture;
-

@@ -2,15 +2,9 @@
 # Usage: vivado -mode batch -source program_bitstream.tcl
 # Directory where THIS script lives
 set script_dir [file dirname [file normalize [info script]]]
-set hw_server_url "TCP:localhost:3121"
-
-if {[info exists ::env(HW_SERVER_URL)] && ($::env(HW_SERVER_URL) ne "")} {
-    set hw_server_url $::env(HW_SERVER_URL)
-}
 
 open_hw_manager
-puts "Connecting to hw_server via $hw_server_url"
-connect_hw_server -url $hw_server_url
+connect_hw_server
 open_hw_target
 
 # Select device

@@ -1,5 +1,0 @@
-# helios
-This project is about providing a wildfire detection cube satellite system that is open source for all to use
-Check Out [Getting Started](/docs/Getting_Started.md)
-
-For the Basys3 framebuffer/VGA demo flow, see [Framebuffer Demo](/docs/Framebuffer_Demo.md).

@@ -177,4 +177,3 @@ begin
   vga_rdata_o <= vga_rdata_r;
 
 end architecture;
-
