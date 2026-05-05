@@ -8,8 +8,8 @@ use ieee.numeric_std.all;
 -- The CPU-facing side accepts a 32-bit word plus byte enables because that is
 -- how NEORV32 drives XBUS writes. Rather than infer a more complex multi-port
 -- or write-mask memory, we serialize the enabled lanes and perform one byte
--- write per clock. That keeps synthesis predictable and makes the ready/ack
--- behavior easy to reason about in simulation.
+-- write per clock. That keeps synthesis predictable and gives the bus slave a
+-- simple ready/ack contract.
 --
 -- The second port feeds the live VGA scanout block, so the framebuffer can be
 -- updated by software while the display path reads pixels out continuously.
@@ -26,7 +26,7 @@ entity vram_rgb332_dp is
     cpu_addr_i  : in  unsigned(31 downto 0);
     cpu_wdata_i : in  std_ulogic_vector(31 downto 0);
 
-    -- Indicates VRAM can accept a NEW 32-bit CPU write
+    -- Indicates VRAM can accept a new 32-bit CPU write.
     cpu_ready_o : out std_ulogic;
 
     vga_addr_i  : in  unsigned(14 downto 0);
@@ -115,7 +115,7 @@ begin
           pend_data <= cpu_wdata_i;
           pend_be   <= cpu_be_i;
 
-          -- Always start lane scanning at 0 so simulations stay repeatable.
+          -- Always start lane scanning at 0 so write order is deterministic.
           lane_ptr <= (others => '0');
         end if;
 

@@ -6,11 +6,10 @@ use ieee.numeric_std.all;
 -- The CPU sees a byte-addressed MMIO window starting at 0xF0000000, while the
 -- VRAM write side receives a 32-bit word, byte enables, and a byte offset.
 --
--- The important behavior for teammates to keep in mind is the XBUS handshake.
--- NEORV32 can pulse STB for one cycle and then leave CYC asserted until ACK is
--- returned. That means we cannot depend on STB staying high while the VRAM
--- write path gets ready. Instead, this block latches the request and completes
--- it later when vram_ready_i says the BRAM-side serializer can accept it.
+-- The key behavior is the XBUS handshake. NEORV32 can pulse STB for one cycle
+-- and then leave CYC asserted until ACK is returned. The slave therefore
+-- latches each request and completes it later when vram_ready_i says the
+-- BRAM-side serializer can accept it.
 --
 -- VGA scanout is active, but software access is still write-only for now.
 -- Read transactions are acknowledged and return zero.

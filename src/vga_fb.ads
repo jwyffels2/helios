@@ -21,9 +21,8 @@ package VGA_FB is
    --  Store one RGB332 pixel at (X, Y).
    procedure Put_Pixel (X : X_Coord; Y : Y_Coord; C : Color_332);
 
-   --  Fill the whole framebuffer with one RGB332 color byte. This is useful
-   --  for visible VGA smoke tests because it exercises many sequential MMIO
-   --  writes and produces a full-screen color pattern.
+   --  Fill the whole framebuffer with one RGB332 color byte. This is the
+   --  simplest way to clear the display or paint a full-screen background.
    procedure Fill (C : Color_332);
 
 end VGA_FB;

@@ -1,6 +1,6 @@
 # Create Vivado project and generate bitstream
-# Usage (from C:\helios\rtl):
-#   vivado -mode batch -source create_project.tcl
+# Usage from the repository root:
+#   vivado -mode batch -source rtl/build.tcl
 
 # --------------------------------------------------------------------
 # Setup
@@ -95,8 +95,7 @@ foreach f $fb_vram_files {
 add_files $fb_vram_files
 
 # --------------------------------------------------------------------
-# Your wrapper top-level (instantiates neorv32_top)
-#   File: C:\helios\rtl\helios.vhd
+# Top-level wrapper that instantiates neorv32_top and the framebuffer path.
 # --------------------------------------------------------------------
 set wrapper_vhdl [file join $script_dir helios.vhdl]
 if {![file exists $wrapper_vhdl]} {

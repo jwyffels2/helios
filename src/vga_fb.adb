@@ -20,8 +20,8 @@ package body VGA_FB is
 
    procedure Fill (C : Color_332) is
    begin
-      --  Walk the full MMIO window in order so hardware sees a simple stream
-      --  of byte writes. This is useful for visible VGA bring-up patterns.
+      --  Walk the MMIO window in row-major order so hardware receives a simple
+      --  stream of byte writes.
       for I in FB'Range loop
          FB (I) := C;
       end loop;

@@ -42,7 +42,7 @@ procedure Helios is
 
       --  RGB332 packs one pixel into one byte:
       --  bits 7..5 = red, bits 4..2 = green, bits 1..0 = blue.
-      --  These visible bars make it obvious that CPU writes are reaching VRAM.
+      --  The bars provide an immediate visual check that CPU writes reach VRAM.
       Red   : constant Color_332 := 16#E0#;
       Green : constant Color_332 := 16#1C#;
       Blue  : constant Color_332 := 16#03#;
@@ -59,8 +59,7 @@ procedure Helios is
                Pixel := Blue;
             end if;
 
-            --  Draw a thin white diagonal over the color bars. If this line is
-            --  misplaced, the issue is usually address math rather than color.
+            --  The diagonal makes row and column addressing errors visible.
             if X = (Y * FB_WIDTH) / FB_HEIGHT then
                Pixel := White;
             end if;
@@ -124,13 +123,13 @@ begin
    --  the bootloader workflow on the Basys3.
    Uart0.Init (19200);
 
-   --  Channel 0 is pinned out in the XDC. Keep it enabled so board-level tests
-   --  can confirm the PWM path still works after the framebuffer merge.
+   --  Channel 0 is pinned out in the XDC and remains available for hardware
+   --  checks alongside the framebuffer output.
    Pwm0.Configure (Target_Hz => 5.0, Duty => 0.5);
    Pwm0.Enable;
 
-   --  Paint the framebuffer once at boot so VGA bring-up does not depend on a
-   --  serial command being sent first.
+   --  Paint the framebuffer once at boot so the VGA output is visible without
+   --  requiring a serial command first.
    Draw_Framebuffer_Test_Pattern;
 
    Uart0.Put ("BOOT_OK");
