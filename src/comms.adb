@@ -7,11 +7,6 @@ package body Comms is
         Min.Init;
     end Init;
 
-    procedure Send_Image_Loop (Img_Len : Natural) is
-    begin
-        Min.Send_Image_Loop (Img_Len);
-    end Send_Image_Loop;
-
     procedure Send_Image (Img_Len : Natural) is
     begin
         -- Send one image burst (no loop)
