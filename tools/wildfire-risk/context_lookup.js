@@ -14,7 +14,7 @@ const {
 } = require("./common");
 
 const DEFAULT_CONTEXT_CSV = process.env.HELIOS_WILDFIRE_CONTEXT_CSV
-  || path.join(__dirname, "output", "firms_ee_feature_join.csv");
+  || path.join(__dirname, "data", "firms_ee_feature_join.csv");
 
 function circularDayDifference(left, right) {
   // Wrap around year boundaries so Jan 1 and Dec 31 stay close seasonally.
@@ -51,8 +51,8 @@ function normalizeContextRow(row) {
 
 function buildContextIndex(csvPath = DEFAULT_CONTEXT_CSV) {
   // Index context rows by day-of-year to speed up seasonal nearest search.
-  // If the default path is missing, set HELIOS_WILDFIRE_CONTEXT_CSV or pass
-  // --context-csv to the caller.
+  // The final project includes the default CSV under tools/wildfire-risk/data.
+  // Set HELIOS_WILDFIRE_CONTEXT_CSV or pass --context-csv to use another file.
   const rows = loadCsv(path.resolve(csvPath))
     .map(normalizeContextRow)
     .filter(Boolean);

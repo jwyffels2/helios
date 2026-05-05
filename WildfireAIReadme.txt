@@ -95,10 +95,12 @@ Required input data
 -------------------
 
 The model needs a local CSV with historical fire detections and context fields.
-This file is not committed to git because it is data, not source code.
+The final project folder includes this CSV here:
 
-Set this environment variable to point at the CSV before building a dataset or
-running live scoring:
+  tools/wildfire-risk/data/firms_ee_feature_join.csv
+
+Set this environment variable only if you want to point at a different CSV
+outside the project folder:
 
   HELIOS_WILDFIRE_CONTEXT_CSV
 
@@ -133,8 +135,8 @@ Useful options:
   --fresh
   --resume
 
-The default CSV path comes from HELIOS_WILDFIRE_CONTEXT_CSV. Passing --csv and
---context-csv on the command line overrides the environment variable.
+The default CSV path is tools/wildfire-risk/data/firms_ee_feature_join.csv.
+Passing --csv and --context-csv on the command line overrides the default.
 
 
 Train the model
@@ -215,7 +217,8 @@ Troubleshooting
 
 Dataset build cannot find the CSV:
 
-  Set HELIOS_WILDFIRE_CONTEXT_CSV or pass --csv and --context-csv.
+  Confirm tools/wildfire-risk/data/firms_ee_feature_join.csv is present, or set
+  HELIOS_WILDFIRE_CONTEXT_CSV, or pass --csv and --context-csv.
 
 Live scoring cannot find the model:
 
