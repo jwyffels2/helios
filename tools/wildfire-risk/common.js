@@ -2,14 +2,15 @@
 
 // Shared math/data utilities for wildfire-risk scripts.
 // Centralizing these helpers keeps training, inference, and evaluation behavior
-// consistent across baseline and true-classifier pipelines.
+// consistent across the dataset, model, and live scoring steps.
 
 const fs = require("fs");
 const path = require("path");
 
 const FEATURE_SPECS = [
-  // Baseline proxy-model feature mapping. Each entry maps the normalized model
-  // feature name to the column name used by the original FIRMS/environment CSV.
+  // Legacy feature mapping kept for compatibility with saved exploratory
+  // artifacts. The end-project path uses TRUE_FEATURE_NAMES in
+  // true_classifier_common.js.
   { name: "lat", source: "lat" },
   { name: "long", source: "long" },
   { name: "groundHeatFlux", source: "Ground_Heat_Flux_surface" },
@@ -166,7 +167,8 @@ function buildFeatureMap(record, fallbackDate) {
 }
 
 function confidenceToTarget(confidenceValue, threshold = 80) {
-  // FIRMS confidence proxy label used by the baseline model.
+  // Compatibility helper for older artifacts that used FIRMS confidence as a
+  // proxy target. The end-project classifier uses explicit positives/negatives.
   const numericConfidence = parseNumber(confidenceValue);
   return numericConfidence !== null && numericConfidence >= threshold ? 1 : 0;
 }

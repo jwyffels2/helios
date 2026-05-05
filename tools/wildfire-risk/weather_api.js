@@ -11,9 +11,9 @@ const path = require("path");
 const DEFAULT_CACHE_DIR = path.join(__dirname, "output", "cache", "open-meteo");
 const FORECAST_CACHE_MAX_AGE_MS = 60 * 60 * 1000;
 let nextRequestAllowedAt = 0;
-// Open-Meteo requests are shared by dataset generation and demos. The module
-// caches successful responses locally, retries rate-limit responses, and can
-// throttle calls so large dataset builds do not hammer the API.
+// Open-Meteo requests are shared by dataset generation and live scoring. The
+// module caches successful responses locally, retries rate-limit responses, and
+// can throttle calls so large dataset builds do not hammer the API.
 
 function toIsoHourString(value) {
   // Open-Meteo hourly timestamps are usually naive; normalize to explicit UTC.
@@ -327,7 +327,7 @@ async function fetchOpenMeteoArchive(latitude, longitude, isoDateTime, requestOp
 }
 
 async function fetchOpenMeteoForecast(latitude, longitude) {
-  // Near-real-time forecast/current query used for live and batch inference.
+  // Near-real-time forecast/current query used for live inference.
   // past_days=7 is requested for the same reason as archive generation: the
   // true classifier expects short-term history features in addition to current
   // weather.

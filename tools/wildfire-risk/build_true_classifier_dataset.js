@@ -31,7 +31,7 @@ function parseArguments(argv) {
   // Dataset-generation knobs:
   // sample sizes, negative mining, API retry behavior, and checkpoint cadence.
   const args = {
-    csv: "c:\\Users\\Leonard\\Desktop\\firms_ee_feature_join.csv",
+    csv: DEFAULT_CONTEXT_CSV,
     output: path.join(__dirname, "output", "true_classifier_dataset.json"),
     positives: 25,
     negatives: 25,

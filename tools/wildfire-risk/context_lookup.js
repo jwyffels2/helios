@@ -1,9 +1,8 @@
 "use strict";
 
 // Looks up static or slowly changing context features for a coordinate/date.
-// It builds an index from the local FIRMS feature join and returns the nearest
-// seasonal match so live scoring can reuse vegetation and drought context even
-// when the weather API does not provide those fields directly.
+// The context CSV is provided outside git, then indexed locally so live scoring
+// can reuse vegetation and drought fields that the weather API does not return.
 
 const path = require("path");
 const {
@@ -14,7 +13,8 @@ const {
   parseNumber,
 } = require("./common");
 
-const DEFAULT_CONTEXT_CSV = "c:\\Users\\Leonard\\Desktop\\firms_ee_feature_join.csv";
+const DEFAULT_CONTEXT_CSV = process.env.HELIOS_WILDFIRE_CONTEXT_CSV
+  || path.join(__dirname, "output", "firms_ee_feature_join.csv");
 
 function circularDayDifference(left, right) {
   // Wrap around year boundaries so Jan 1 and Dec 31 stay close seasonally.
@@ -51,6 +51,8 @@ function normalizeContextRow(row) {
 
 function buildContextIndex(csvPath = DEFAULT_CONTEXT_CSV) {
   // Index context rows by day-of-year to speed up seasonal nearest search.
+  // If the default path is missing, set HELIOS_WILDFIRE_CONTEXT_CSV or pass
+  // --context-csv to the caller.
   const rows = loadCsv(path.resolve(csvPath))
     .map(normalizeContextRow)
     .filter(Boolean);

@@ -1,11 +1,10 @@
 "use strict";
 
 // Scores one coordinate/date request with the true wildfire classifier.
-// This is the single-point demo/inference entry point: it fetches or replays
-// weather data, merges nearest context features, runs the model, and prints the
-// calibrated probability plus the completed feature set.
+// This is the runtime entry point: it fetches weather data, merges nearest
+// context features, runs the model, and prints the calibrated probability plus
+// the completed feature set.
 
-const fs = require("fs");
 const path = require("path");
 const {
   loadJson,
@@ -32,7 +31,6 @@ function parseArguments(argv) {
     latitude: null,
     longitude: null,
     date: null,
-    sourceFile: null,
     contextCsv: DEFAULT_CONTEXT_CSV,
   };
 
@@ -54,9 +52,6 @@ function parseArguments(argv) {
     } else if (token === "--date") {
       args.date = argv[index + 1];
       index += 1;
-    } else if (token === "--source-file") {
-      args.sourceFile = argv[index + 1];
-      index += 1;
     } else if (token === "--context-csv") {
       args.contextCsv = argv[index + 1];
       index += 1;
@@ -71,12 +66,6 @@ function parseArguments(argv) {
 }
 
 async function loadWeatherPayload(args) {
-  // Offline replay mode is useful for deterministic demos/tests.
-  if (args.sourceFile) {
-    const json = fs.readFileSync(path.resolve(args.sourceFile), "utf8");
-    return JSON.parse(json);
-  }
-
   return fetchOpenMeteoForecast(args.latitude, args.longitude);
 }
 
@@ -104,17 +93,12 @@ async function main() {
   } = scoreTrueClassifierInput(apiMappedInput, model, new Date(apiMappedInput.date));
 
   const result = {
-    // Keep both raw inputs and completed features in the output so single-point
-    // demo results can be traced back to API/context/imputation decisions.
-    source: args.sourceFile
-      ? {
-          type: "file",
-          path: path.resolve(args.sourceFile),
-        }
-      : {
-          type: "open-meteo",
-          url: "https://api.open-meteo.com/v1/forecast",
-        },
+    // Keep both raw inputs and completed features in the output so results can
+    // be traced back to API/context/imputation decisions.
+    source: {
+      type: "open-meteo",
+      url: "https://api.open-meteo.com/v1/forecast",
+    },
     coordinates: {
       lat: args.latitude,
       long: args.longitude,

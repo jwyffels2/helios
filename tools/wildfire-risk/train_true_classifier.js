@@ -2,7 +2,7 @@
 
 // Trains the true wildfire classifier from a generated labeled dataset.
 // This script handles the geo/time split, normalization, calibration, metric
-// reporting, and writes the model artifact used by live and batch inference.
+// reporting, and writes the model artifact used by live inference.
 
 const path = require("path");
 const {
@@ -293,7 +293,8 @@ function main() {
 
   saveJson(args.output, modelDocument);
 
-  // Emit concise metrics for quick run-to-run comparison.
+  // Emit concise metrics so training runs can be reviewed without opening the
+  // model artifact.
   console.log(`Saved model to ${path.resolve(args.output)}`);
   console.log(`Rows: train=${training.length} validation=${validation.length} test=${test.length}`);
   console.log(`Calibration: ${calibration.type} (${calibration.status})`);

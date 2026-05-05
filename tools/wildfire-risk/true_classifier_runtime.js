@@ -1,9 +1,8 @@
 "use strict";
 
 // Shared runtime scoring helper for the true wildfire classifier.
-// Centralizing this logic keeps single-point inference, batch inference, and
-// fixture verification consistent on imputation, normalization, raw score, and
-// calibrated probability handling.
+// Centralizing this logic keeps live inference consistent on imputation,
+// normalization, raw score, and calibrated probability handling.
 
 const {
   calibrateLogit,
