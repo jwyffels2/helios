@@ -12,26 +12,6 @@ extern uint8_t image_buf[];
 #define NEORV32_CPU_CLK_HZ 50000000UL
 #endif
 
-static inline uint64_t rdcycle64(void) {
-    uint32_t hi0, lo, hi1;
-    __asm__ volatile ("rdcycleh %0" : "=r"(hi0));
-    __asm__ volatile ("rdcycle  %0" : "=r"(lo));
-    __asm__ volatile ("rdcycleh %0" : "=r"(hi1));
-    if (hi0 != hi1) {
-        __asm__ volatile ("rdcycle  %0" : "=r"(lo));
-        hi0 = hi1;
-    }
-    return ((uint64_t)hi0 << 32) | lo;
-}
-
-static void delay_ms(uint32_t ms) {
-    const uint64_t ticks = ((uint64_t)NEORV32_CPU_CLK_HZ / 1000ULL) * (uint64_t)ms;
-    const uint64_t start = rdcycle64();
-    while ((rdcycle64() - start) < ticks) {
-        __asm__ volatile ("nop");
-    }
-}
-
 // Message IDs
 #define MIN_ID_IMG_START  10
 #define MIN_ID_IMG_CHUNK  11
@@ -95,17 +75,4 @@ void min_glue_send_image_once(uint32_t image_len) {
     min_send_frame(&g_ctx, MIN_ID_IMG_END, end_payload, (uint8_t)sizeof(end_payload));
 
     image_id++;
-}
-
-// Old test entry point can stay if you want compatibility.
-// For now, just leave it empty or keep it if still useful.
-void min_glue_send_test(void) {
-    // no-op
-}
-
-void min_glue_send_image_loop(uint32_t image_len) {
-    for (;;) {
-        min_glue_send_image_once(image_len);
-        delay_ms(10000);
-    }
 }
